@@ -914,7 +914,7 @@
       formData.append('model', model);
       formData.append('strength', document.getElementById('strengthRange').value / 100);
 
-      const res = await fetch('/api/transform', { method: 'POST', body: formData });
+      const res = await fetch('https://realistic-viper-morph-82184336.koyeb.app/api/transform', { method: 'POST', body: formData });
       const data = await res.json();
 
       clearInterval(interval);
@@ -1007,7 +1007,7 @@
     closeModal();
 
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('https://realistic-viper-morph-82184336.koyeb.app/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credits: selectedPlanCredits, price: selectedPlanPrice })
