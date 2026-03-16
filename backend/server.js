@@ -85,6 +85,27 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+// Função para fazer upload de buffer para Cloudinary
+async function uploadBufferToCloudinary(buffer, folder) {
+  return new Promise(async (resolve, reject) => {
+    const { Readable } = await import('stream');
+    const readableStream = Readable.from([buffer]);
+    
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: "image"
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    
+    readableStream.pipe(uploadStream);
+  });
+}
+
 // CADASTRO
 app.post("/api/auth/cadastro", async (req, res) => {
   try {
@@ -174,7 +195,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// TRANSFORMAR IMAGEM - CORRIGIDO PARA STREAM
+// TRANSFORMAR IMAGEM - IP-ADAPTER FACE ID (MANTÉM O ROSTO)
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   let tempFile = req.file?.path;
   
@@ -198,8 +219,9 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
       return res.status(400).json({ success: false, error: "Nenhuma imagem enviada" });
     }
 
-    const prompt = req.body.prompt?.trim() || "realistic portrait";
-    const strength = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1);
+    const prompt = req.body.prompt?.trim() || "a person";
+    // IP-Adapter usa scale (0-1) em vez de strength
+    const scale = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1.0);
 
     console.log("Fazendo upload para Cloudinary...");
     
@@ -215,62 +237,53 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    // Processamento na fila
-    console.log("Enviando para Replicate...");
+    // Processamento na fila usando IP-Adapter Face ID
+    console.log("Enviando para IP-Adapter Face ID... Prompt:", prompt, "Scale:", scale);
     
     const resultado = await queue.add(async () => {
+      // IP-Adapter Face ID - mantém o rosto perfeitamente
       const output = await replicate.run(
-        "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
+        "tencentarc/ip-adapter-faceid:eb8d9ab9e001d6ebf74b6e10d5e9c6b8f2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
         {
           input: {
             image: cloudResult.secure_url,
             prompt: prompt,
-            strength: strength,
-            num_outputs: 1,
-            scheduler: "K_EULER",
-            num_inference_steps: 50,
-            guidance_scale: 7.5
+            negative_prompt: "blurry, low quality, distorted face, ugly, deformed, extra limbs, bad anatomy",
+            scale: scale,
+            width: 512,
+            height: 512,
+            num_inference_steps: 30,
+            guidance_scale: 7.5,
+            seed: -1
           }
         }
       );
       
-      console.log("Replicate output raw:", output);
+      console.log("IP-Adapter output:", output);
       return output;
     });
 
     if (!resultado || resultado.length === 0) {
-      throw new Error("Replicate não retornou resultado");
+      throw new Error("IP-Adapter não retornou resultado");
     }
 
-    // O resultado é um ReadableStream - precisamos converter para buffer
-    const stream = resultado[0];
-    console.log("Tipo do resultado:", typeof stream, stream.constructor.name);
+    // Processa o resultado
+    let finalImageUrl;
     
-    // Converte stream para buffer
-    const buffer = await streamToBuffer(stream);
-    console.log("Buffer size:", buffer.length);
-    
-    // Faz upload da imagem gerada para Cloudinary
-    console.log("Fazendo upload do resultado para Cloudinary...");
-    const resultUpload = await new Promise(async (resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "morph_results",
-          resource_type: "image"
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
+    if (typeof resultado[0] === 'string') {
+      // Se for string (URL), usa diretamente
+      finalImageUrl = resultado[0];
+      console.log("Resultado é URL:", finalImageUrl);
+    } else {
+      // Se for stream, converte e faz upload
+      console.log("Resultado é stream, convertendo...");
+      const stream = resultado[0];
+      const buffer = await streamToBuffer(stream);
       
-      // Converte buffer para stream e faz upload
-      const { Readable } = await import('stream');
-      const readableStream = Readable.from([buffer]);
-      readableStream.pipe(uploadStream);
-    });
-    
-    const finalImageUrl = resultUpload.secure_url;
+      const uploadResult = await uploadBufferToCloudinary(buffer, "morph_results");
+      finalImageUrl = uploadResult.secure_url;
+    }
+
     console.log("URL final:", finalImageUrl);
 
     // Salva no histórico
