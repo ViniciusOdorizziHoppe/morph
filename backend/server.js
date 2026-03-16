@@ -17,20 +17,20 @@ const app = express();
 
 app.use(express.json());
 
-// CORS configurado corretamente
+// CORS
 app.use(cors({
   origin: true,
   credentials: true
 }));
 
-// Configuração Cloudinary
+// Cloudinary config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Conexão MongoDB
+// Database
 mongoose.connect(process.env.MONGO_URI);
 
 // Schemas
@@ -54,16 +54,14 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN
 });
 
-// Fila de processamento
+// Fila
 const queue = new PQueue({ concurrency: 1 });
-
-// Multer config
 const upload = multer({ 
   dest: os.tmpdir(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Middleware de autenticação
+// Auth middleware
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ success: false, error: "Token ausente" });
@@ -167,12 +165,12 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// TRANSFORMAR IMAGEM
+// TRANSFORMAR IMAGEM - CORRIGIDO
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   let tempFile = req.file?.path;
   
   try {
-    // Verifica créditos e decrementa
+    // Verifica créditos
     const user = await Usuario.findOneAndUpdate(
       { _id: req.userId, creditos: { $gte: 1 } },
       { $inc: { creditos: -1 } },
@@ -194,20 +192,25 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     const prompt = req.body.prompt?.trim() || "realistic portrait";
     const strength = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1);
 
-    // Upload da imagem para Cloudinary
     console.log("Fazendo upload para Cloudinary...");
+    
+    // Upload para Cloudinary
     const cloudResult = await cloudinary.uploader.upload(tempFile, {
       folder: "morph_uploads",
       resource_type: "image"
     });
 
+    console.log("Upload concluído:", cloudResult.secure_url);
+
     // Remove arquivo temporário
     await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    // Processamento na fila (Replicate)
+    // Processamento na fila
     console.log("Enviando para Replicate...");
+    
     const resultado = await queue.add(async () => {
+      // Usando o modelo correto img2img
       const output = await replicate.run(
         "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
         {
@@ -222,24 +225,27 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
           }
         }
       );
+      console.log("Replicate output:", output);
       return output;
     });
 
-    if (!resultado || !resultado[0]) {
+    if (!resultado || resultado.length === 0) {
       throw new Error("Replicate não retornou resultado");
     }
+
+    const imageUrl = resultado[0];
 
     // Salva no histórico
     await Geracao.create({
       usuario: req.userId,
       imagem: cloudResult.secure_url,
-      resultado: resultado[0],
+      resultado: imageUrl,
       prompt
     });
 
     res.json({
       success: true,
-      imageUrl: resultado[0],
+      imageUrl: imageUrl,
       creditos: user.creditos
     });
 
@@ -275,27 +281,10 @@ app.get("/api/historico", auth, async (req, res) => {
   }
 });
 
-// VERIFICAR TOKEN (para manter sessão)
-app.get("/api/me", auth, async (req, res) => {
-  try {
-    const user = await Usuario.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
-    
-    res.json({
-      id: user._id,
-      nome: user.nome,
-      email: user.email,
-      creditos: user.creditos
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Erro ao verificar usuário" });
-  }
-});
-
-// Health check
+// Health
 app.get("/", (req, res) => res.json({ status: "API ONLINE", timestamp: new Date().toISOString() }));
 
-// Error handler global
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, error: "Erro interno do servidor" });
