@@ -14,25 +14,17 @@ dotenv.config()
 
 const app = express()
 
-/* =====================
-CORS
-===================== */
+app.use(express.json())
 
 app.use(cors({
- origin: [
-  "https://morph-one-tan.vercel.app"
- ],
- methods: ["GET","POST"],
- credentials: true
+ origin: "*"
 }))
-
-app.use(express.json())
 
 /* =====================
 DATABASE
 ===================== */
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGODB_URI)
 
 const Usuario = mongoose.model("Usuario", new mongoose.Schema({
  email:String,
@@ -123,11 +115,15 @@ app.post("/api/register", async(req,res)=>{
    senha:hash
   })
 
-  res.json({ok:true})
+  res.json({
+   success:true
+  })
 
  }catch{
 
-  res.status(500).json({erro:"erro registro"})
+  res.status(500).json({
+   success:false
+  })
 
  }
 
@@ -139,36 +135,33 @@ LOGIN
 
 app.post("/api/login", async(req,res)=>{
 
- try{
+ const {email,senha} = req.body
 
-  const {email,senha} = req.body
+ const user = await Usuario.findOne({email})
 
-  const user = await Usuario.findOne({email})
-
-  if(!user)
-   return res.status(401).json({erro:"usuario"})
-
-  const ok = await bcrypt.compare(senha,user.senha)
-
-  if(!ok)
-   return res.status(401).json({erro:"senha"})
-
-  const token = jwt.sign(
-   {id:user._id},
-   process.env.JWT_SECRET,
-   {expiresIn:"7d"}
-  )
-
-  res.json({
-   token,
-   creditos:user.creditos
+ if(!user)
+  return res.status(401).json({
+   success:false
   })
 
- }catch{
+ const ok = await bcrypt.compare(senha,user.senha)
 
-  res.status(500).json({erro:"erro login"})
+ if(!ok)
+  return res.status(401).json({
+   success:false
+  })
 
- }
+ const token = jwt.sign(
+  {id:user._id},
+  process.env.JWT_SECRET,
+  {expiresIn:"7d"}
+ )
+
+ res.json({
+  success:true,
+  token,
+  creditos:user.creditos
+ })
 
 })
 
@@ -192,6 +185,7 @@ app.post(
 
   if(!user)
    return res.status(402).json({
+    success:false,
     erro:"sem créditos"
    })
 
@@ -199,7 +193,7 @@ app.post(
 
   if(!file)
    return res.status(400).json({
-    erro:"imagem ausente"
+    success:false
    })
 
   const prompt = req.body.prompt || "realistic portrait"
@@ -229,7 +223,8 @@ app.post(
   await fs.promises.unlink(file.path)
 
   res.json({
-   imagem:resultado[0],
+   success:true,
+   imageUrl:resultado[0],
    creditos:user.creditos
   })
 
@@ -238,7 +233,7 @@ app.post(
   console.error(e)
 
   res.status(500).json({
-   erro:"erro geração"
+   success:false
   })
 
  }
@@ -274,7 +269,7 @@ app.get("/",(req,res)=>{
 START
 ===================== */
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 8000
 
 app.listen(PORT,()=>{
  console.log("server rodando")

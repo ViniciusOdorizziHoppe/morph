@@ -867,91 +867,145 @@
     document.getElementById('creditCost').textContent = cost + (cost > 1 ? ' créditos' : ' crédito');
   });
 
-  // GENERATE
-  async function generate() {
-    if (!selectedFile) { showToast('⚠ Selecione uma imagem primeiro', 'error'); return; }
-    const prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) { showToast('⚠ Descreva a transformação desejada', 'error'); return; }
+ async function generate(){
 
-    const costs = { 'sdxl': 1, 'sdxl-refiner': 2, 'stable-diffusion-3': 3 };
-    const model = document.getElementById('modelSelect').value;
-    const cost = costs[model];
+ const token = localStorage.getItem("token")
 
-    if (credits < cost) {
-      openModal();
-      showToast('⚠ Créditos insuficientes!', 'error');
-      return;
-    }
+ if(!token){
+  alert("Faça login primeiro")
+  return
+ }
 
-    // UI loading
-    document.getElementById('generateBtn').disabled = true;
-    document.getElementById('resultPlaceholder').style.display = 'none';
-    document.getElementById('outputImg').style.display = 'none';
-    document.getElementById('resultActions').style.display = 'none';
-    const loader = document.getElementById('loader');
-    loader.classList.add('active');
+ if(!selectedFile){
+  alert("Selecione uma imagem")
+  return
+ }
 
-    // Simula progresso
-    const messages = ['Carregando imagem...', 'Aplicando transformação...', 'Refinando detalhes...', 'Finalizando em HD...'];
-    let progress = 0;
-    let msgIdx = 0;
-    const fill = document.getElementById('loaderFill');
-    const loaderText = document.getElementById('loaderText');
+ const prompt = document.getElementById("promptInput").value
+ const model = document.getElementById("modelSelect").value
+ const cost = 1
 
-    const interval = setInterval(() => {
-      progress = Math.min(progress + Math.random() * 12, 92);
-      fill.style.width = progress + '%';
-      if (progress > 25 && msgIdx === 0) { loaderText.textContent = messages[1]; msgIdx = 1; }
-      if (progress > 55 && msgIdx === 1) { loaderText.textContent = messages[2]; msgIdx = 2; }
-      if (progress > 80 && msgIdx === 2) { loaderText.textContent = messages[3]; msgIdx = 3; }
-    }, 400);
+ // UI loading
+ document.getElementById('generateBtn').disabled = true
+ document.getElementById('resultPlaceholder').style.display = 'none'
+ document.getElementById('outputImg').style.display = 'none'
+ document.getElementById('resultActions').style.display = 'none'
 
-    try {
-      // CHAMADA REAL À API DO BACKEND
-      const formData = new FormData();
-      formData.append('image', selectedFile);
-      formData.append('prompt', prompt);
-      formData.append('model', model);
-      formData.append('strength', document.getElementById('strengthRange').value / 100);
+ const loader = document.getElementById('loader')
+ loader.classList.add('active')
 
-      const res = await fetch('https://realistic-viper-morph-82184336.koyeb.app/api/transform', { method: 'POST', body: formData });
-      const data = await res.json();
+ // progresso visual
+ const messages = [
+  'Carregando imagem...',
+  'Aplicando transformação...',
+  'Refinando detalhes...',
+  'Finalizando em HD...'
+ ]
 
-      clearInterval(interval);
-      fill.style.width = '100%';
+ let progress = 0
+ let msgIdx = 0
 
-      setTimeout(() => {
-        loader.classList.remove('active');
-        document.getElementById('generateBtn').disabled = false;
+ const fill = document.getElementById('loaderFill')
+ const loaderText = document.getElementById('loaderText')
 
-        if (data.success) {
-          credits -= cost;
-          updateCredits();
+ const interval = setInterval(() => {
 
-          const outputImg = document.getElementById('outputImg');
-          outputImg.src = data.imageUrl;
-          outputImg.style.display = 'block';
-          document.getElementById('downloadBtn').href = data.imageUrl;
-          document.getElementById('resultActions').style.display = 'flex';
+  progress = Math.min(progress + Math.random() * 12, 92)
 
-          addToHistory(data.imageUrl);
-          showToast('✓ Imagem transformada com sucesso!', 'success');
-        } else {
-          document.getElementById('resultPlaceholder').style.display = 'flex';
-          showToast('✗ ' + (data.error || 'Erro ao processar'), 'error');
-        }
-        fill.style.width = '0%';
-      }, 500);
+  fill.style.width = progress + '%'
 
-    } catch (err) {
-      clearInterval(interval);
-      loader.classList.remove('active');
-      document.getElementById('resultPlaceholder').style.display = 'flex';
-      document.getElementById('generateBtn').disabled = false;
-      showToast('✗ Erro de conexão com o servidor', 'error');
-      fill.style.width = '0%';
-    }
+  if(progress > 25 && msgIdx === 0){
+   loaderText.textContent = messages[1]
+   msgIdx = 1
   }
+
+  if(progress > 55 && msgIdx === 1){
+   loaderText.textContent = messages[2]
+   msgIdx = 2
+  }
+
+  if(progress > 80 && msgIdx === 2){
+   loaderText.textContent = messages[3]
+   msgIdx = 3
+  }
+
+ },400)
+
+ try{
+
+  const formData = new FormData()
+  formData.append("image", selectedFile)
+  formData.append("prompt", prompt)
+  formData.append("model", model)
+  formData.append("strength", document.getElementById('strengthRange').value / 100)
+
+  const res = await fetch(
+   "https://realistic-viper-morph-82184336.koyeb.app/api/transform",
+   {
+    method:"POST",
+    headers:{
+     Authorization:`Bearer ${token}`
+    },
+    body:formData
+   }
+  )
+
+  const data = await res.json()
+
+  clearInterval(interval)
+
+  fill.style.width = "100%"
+
+  setTimeout(()=>{
+
+   loader.classList.remove("active")
+   document.getElementById('generateBtn').disabled = false
+
+   if(data.success){
+
+    credits -= cost
+    updateCredits()
+
+    const outputImg = document.getElementById("outputImg")
+
+    outputImg.src = data.imageUrl
+    outputImg.style.display = "block"
+
+    document.getElementById("downloadBtn").href = data.imageUrl
+    document.getElementById("resultActions").style.display = "flex"
+
+    addToHistory(data.imageUrl)
+
+    showToast("✓ Imagem transformada com sucesso!","success")
+
+   }else{
+
+    document.getElementById('resultPlaceholder').style.display = 'flex'
+
+    showToast("✗ " + (data.error || "Erro ao processar"),"error")
+
+   }
+
+   fill.style.width = "0%"
+
+  },500)
+
+ }catch(err){
+
+  clearInterval(interval)
+
+  loader.classList.remove("active")
+
+  document.getElementById('resultPlaceholder').style.display = 'flex'
+  document.getElementById('generateBtn').disabled = false
+
+  showToast("✗ Erro de conexão com o servidor","error")
+
+  fill.style.width = "0%"
+
+ }
+
+}
 
   function resetResult() {
     document.getElementById('outputImg').style.display = 'none';
