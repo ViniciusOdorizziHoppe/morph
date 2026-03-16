@@ -19,10 +19,8 @@ app.use(express.json());
 
 // CORS configurado corretamente
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "https://morph-one-tan.vercel.app",
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: true,
+  credentials: true
 }));
 
 // Configuração Cloudinary
