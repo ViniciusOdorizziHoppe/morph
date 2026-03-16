@@ -67,12 +67,13 @@ app.post('/api/transform', transformLimiter, upload.single('image'), async (req,
       const uploadResult = await cloudinary.uploader.upload(file.path, { folder: 'morph/inputs' })
       fs.unlinkSync(file.path)
 
-      const output = await replicate.run('black-forest-labs/flux-schnell', {
+      const output = await replicate.run('black-forest-labs/flux-dev', {
         input: {
           image: uploadResult.secure_url,
           prompt: prompt,
           strength: parseFloat(strength),
-          num_inference_steps: 4,
+          num_inference_steps: 28,
+          guidance: 3.5,
           output_format: 'jpg',
           output_quality: 90,
         }
