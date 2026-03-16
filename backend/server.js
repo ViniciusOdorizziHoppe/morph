@@ -105,7 +105,7 @@ app.post('/api/transform', transformLimiter, upload.single('image'), async (req,
             image:imageUrl,
             prompt:prompt,
             strength:parseFloat(strength),
-            num_inference_steps:20, // reduz custo
+            num_inference_steps:28, // reduz custo
             guidance:3.5,
             output_format:'jpg',
             output_quality:90
