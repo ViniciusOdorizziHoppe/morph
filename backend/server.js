@@ -270,7 +270,7 @@ app.get("/api/historico", auth, async (req, res) => {
       imagemInput: g.imagem,
       prompt: g.prompt, 
       data: g.data 
-    }));
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erro ao carregar histórico" });
