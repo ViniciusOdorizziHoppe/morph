@@ -8,10 +8,24 @@ import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
 import Replicate from "replicate"
 import PQueue from "p-queue"
+import cors from "cors"
 
 dotenv.config()
 
 const app = express()
+
+/* =====================
+CORS
+===================== */
+
+app.use(cors({
+ origin: [
+  "https://morph-one-tan.vercel.app"
+ ],
+ methods: ["GET","POST"],
+ credentials: true
+}))
+
 app.use(express.json())
 
 /* =====================
@@ -98,16 +112,24 @@ REGISTER
 
 app.post("/api/register", async(req,res)=>{
 
- const {email,senha} = req.body
+ try{
 
- const hash = await bcrypt.hash(senha,10)
+  const {email,senha} = req.body
 
- const user = await Usuario.create({
-  email,
-  senha:hash
- })
+  const hash = await bcrypt.hash(senha,10)
 
- res.json({ok:true})
+  const user = await Usuario.create({
+   email,
+   senha:hash
+  })
+
+  res.json({ok:true})
+
+ }catch{
+
+  res.status(500).json({erro:"erro registro"})
+
+ }
 
 })
 
@@ -117,28 +139,36 @@ LOGIN
 
 app.post("/api/login", async(req,res)=>{
 
- const {email,senha} = req.body
+ try{
 
- const user = await Usuario.findOne({email})
+  const {email,senha} = req.body
 
- if(!user)
-  return res.status(401).json({erro:"usuario"})
+  const user = await Usuario.findOne({email})
 
- const ok = await bcrypt.compare(senha,user.senha)
+  if(!user)
+   return res.status(401).json({erro:"usuario"})
 
- if(!ok)
-  return res.status(401).json({erro:"senha"})
+  const ok = await bcrypt.compare(senha,user.senha)
 
- const token = jwt.sign(
-  {id:user._id},
-  process.env.JWT_SECRET,
-  {expiresIn:"7d"}
- )
+  if(!ok)
+   return res.status(401).json({erro:"senha"})
 
- res.json({
-  token,
-  creditos:user.creditos
- })
+  const token = jwt.sign(
+   {id:user._id},
+   process.env.JWT_SECRET,
+   {expiresIn:"7d"}
+  )
+
+  res.json({
+   token,
+   creditos:user.creditos
+  })
+
+ }catch{
+
+  res.status(500).json({erro:"erro login"})
+
+ }
 
 })
 
@@ -186,6 +216,7 @@ app.post(
    )
 
    return output
+
   })
 
   await Geracao.create({
