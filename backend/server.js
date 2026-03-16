@@ -76,36 +76,6 @@ function auth(req, res, next) {
   }
 }
 
-// Função para converter stream para buffer
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-// Função para fazer upload de buffer para Cloudinary
-async function uploadBufferToCloudinary(buffer, folder) {
-  return new Promise(async (resolve, reject) => {
-    const { Readable } = await import('stream');
-    const readableStream = Readable.from([buffer]);
-    
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: folder,
-        resource_type: "image"
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
-    );
-    
-    readableStream.pipe(uploadStream);
-  });
-}
-
 // CADASTRO
 app.post("/api/auth/cadastro", async (req, res) => {
   try {
@@ -195,7 +165,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// TRANSFORMAR IMAGEM - IP-ADAPTER FACE ID (MANTÉM O ROSTO)
+// TRANSFORMAR IMAGEM - INSTANTID (MANTÉM O ROSTO PERFEITAMENTE)
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   let tempFile = req.file?.path;
   
@@ -220,8 +190,8 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     }
 
     const prompt = req.body.prompt?.trim() || "a person";
-    // IP-Adapter usa scale (0-1) em vez de strength
-    const scale = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1.0);
+    // InstantID usa strength (0-1)
+    const strength = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1.0);
 
     console.log("Fazendo upload para Cloudinary...");
     
@@ -237,53 +207,38 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    // Processamento na fila usando IP-Adapter Face ID
-    console.log("Enviando para IP-Adapter Face ID... Prompt:", prompt, "Scale:", scale);
+    // Processamento na fila usando InstantID
+    console.log("Enviando para InstantID... Prompt:", prompt, "Strength:", strength);
     
     const resultado = await queue.add(async () => {
-      // IP-Adapter Face ID - mantém o rosto perfeitamente
+      // InstantID - preservação facial perfeita
       const output = await replicate.run(
-        "tencentarc/ip-adapter-faceid:eb8d9ab9e001d6ebf74b6e10d5e9c6b8f2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
+        "instantx/instantid:6af8583c541261472e92155d87bba80d5e5c5c6717f895b61454783c319b435b",
         {
           input: {
             image: cloudResult.secure_url,
             prompt: prompt,
-            negative_prompt: "blurry, low quality, distorted face, ugly, deformed, extra limbs, bad anatomy",
-            scale: scale,
+            negative_prompt: "blurry, low quality, distorted face, ugly, deformed, extra limbs, bad anatomy, watermark, signature",
             width: 512,
             height: 512,
             num_inference_steps: 30,
             guidance_scale: 7.5,
-            seed: -1
+            ip_adapter_scale: strength, // Controla força da preservação do rosto
+            controlnet_conditioning_scale: 0.8
           }
         }
       );
       
-      console.log("IP-Adapter output:", output);
+      console.log("InstantID output:", output);
       return output;
     });
 
     if (!resultado || resultado.length === 0) {
-      throw new Error("IP-Adapter não retornou resultado");
+      throw new Error("InstantID não retornou resultado");
     }
 
-    // Processa o resultado
-    let finalImageUrl;
-    
-    if (typeof resultado[0] === 'string') {
-      // Se for string (URL), usa diretamente
-      finalImageUrl = resultado[0];
-      console.log("Resultado é URL:", finalImageUrl);
-    } else {
-      // Se for stream, converte e faz upload
-      console.log("Resultado é stream, convertendo...");
-      const stream = resultado[0];
-      const buffer = await streamToBuffer(stream);
-      
-      const uploadResult = await uploadBufferToCloudinary(buffer, "morph_results");
-      finalImageUrl = uploadResult.secure_url;
-    }
-
+    // Processa o resultado - InstantID retorna array de URLs
+    let finalImageUrl = resultado[0];
     console.log("URL final:", finalImageUrl);
 
     // Salva no histórico
