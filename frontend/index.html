@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MORPH — Transforme qualquer imagem</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080810;
+    --surface: #0f0f1a;
+    --border: #1e1e35;
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --success: #10b981;
+    --error: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow blob */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAVBAR */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    background: rgba(8,8,16,0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, #a78bfa, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .nav-credits {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .nav-credits span {
+    color: #a78bfa;
+    font-weight: 600;
+  }
+
+  .btn-buy {
+    background: linear-gradient(135deg, var(--accent), #5b21b6);
+    color: white;
+    border: none;
+    border-radius: 100px;
+    padding: 10px 22px;
+    font-size: 0.85rem;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-buy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px rgba(124,58,237,0.4);
+  }
+
+  /* MAIN */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 120px 24px 60px;
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    margin-bottom: 64px;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    color: #a78bfa;
+    margin-bottom: 24px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin-bottom: 20px;
+    letter-spacing: -0.02em;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    font-size: 1.1rem;
+    color: var(--muted);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* APP CARD */
+  .app-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px;
+    animation: fadeUp 0.8s ease 0.2s both;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 700px) {
+    .columns { grid-template-columns: 1fr; }
+    nav { padding: 16px 20px; }
+    .app-card { padding: 24px; }
+  }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    background: rgba(124,58,237,0.03);
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,58,237,0.07);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(124,58,237,0.15);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .upload-zone p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .upload-zone strong {
+    color: #a78bfa;
+    font-weight: 500;
+  }
+
+  .upload-zone img.preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+  }
+
+  .upload-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* RESULT ZONE */
+  .result-zone {
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: rgba(6,182,212,0.03);
+  }
+
+  .result-placeholder {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .result-placeholder .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .result-zone img.output {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+  }
+
+  .result-actions {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .result-zone:hover .result-actions { opacity: 1; }
+
+  .btn-sm {
+    background: rgba(8,8,16,0.9);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-sm:hover { border-color: var(--accent); color: #a78bfa; }
+
+  /* LOADER */
+  .loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .loader.active { display: flex; }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loader-text {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .loader-bar {
+    width: 160px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .loader-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  /* CONTROLS */
+  .controls { display: flex; flex-direction: column; gap: 20px; }
+
+  label {
+    display: block;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  textarea, select, input[type=range] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  textarea {
+    padding: 14px 16px;
+    resize: none;
+    height: 110px;
+    line-height: 1.6;
+  }
+
+  textarea:focus, select:focus { border-color: var(--accent); }
+
+  select {
+    padding: 12px 16px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b8a' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+
+  .strength-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .strength-value {
+    font-size: 0.9rem;
+    color: #a78bfa;
+    font-weight: 500;
+  }
+
+  input[type=range] {
+    border: none;
+    height: 4px;
+    padding: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+    border-radius: 10px;
+  }
+
+  /* PRESETS */
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .preset-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--accent);
+    color: #a78bfa;
+    background: rgba(124,58,237,0.1);
+  }
+
+  /* GENERATE BTN */
+  .btn-generate {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, var(--accent), #5b21b6);
+    border: none;
+    border-radius: 14px;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-generate::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #5b21b6, var(--accent2));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-generate:hover::before { opacity: 1; }
+  .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(124,58,237,0.5); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-generate span { position: relative; z-index: 1; }
+
+  /* CREDIT INFO */
+  .credit-info {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: -8px;
+  }
+
+  .credit-info strong { color: #a78bfa; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 480px;
+    width: 100%;
+    animation: scaleIn 0.3s ease;
+  }
+
+  .modal h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .modal p { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+  .plans {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .plan {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .plan:hover, .plan.selected {
+    border-color: var(--accent);
+    background: rgba(124,58,237,0.08);
+  }
+
+  .plan-left { display: flex; flex-direction: column; gap: 3px; }
+  .plan-name { font-weight: 600; font-size: 0.95rem; }
+  .plan-desc { font-size: 0.8rem; color: var(--muted); }
+  .plan-price { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; color: #a78bfa; }
+
+  .btn-checkout {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), #5b21b6);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .btn-checkout:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+
+  .btn-close {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-close:hover { border-color: var(--muted); color: var(--text); }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 12px 24px;
+    font-size: 0.85rem;
+    z-index: 300;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.error { border-color: var(--error); color: var(--error); }
+
+  /* HISTORY */
+  .history-section {
+    margin-top: 48px;
+    animation: fadeUp 0.8s ease 0.4s both;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+
+  .history-item:hover { border-color: var(--accent); transform: scale(1.02); }
+
+  .history-item img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">MORPH</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="nav-credits">⚡ <span id="creditsDisplay">5</span> créditos</div>
+    <button class="btn-buy" onclick="openModal()">Comprar créditos</button>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <div class="hero-badge">✦ Powered by AI</div>
+    <h1>Transforme qualquer<br>imagem em <em>algo novo</em></h1>
+    <p>Envie uma foto, descreva o que quer ver e deixe a IA fazer a mágica. Resultados em HD.</p>
+  </div>
+
+  <div class="app-card">
+    <div class="columns">
+      <!-- ESQUERDA: Upload + Controles -->
+      <div class="controls">
+        <div>
+          <div class="upload-label">Imagem original</div>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" accept="image/*" id="fileInput" onchange="handleFile(this)">
+            <div class="upload-icon">🖼️</div>
+            <p><strong>Clique ou arraste</strong><br>JPG, PNG, WebP até 10MB</p>
+          </div>
+        </div>
+
+        <div>
+          <label>Transformação</label>
+          <textarea id="promptInput" placeholder="Ex: transformar em pintura a óleo estilo Van Gogh, céu estrelado dramático..."></textarea>
+        </div>
+
+        <div>
+          <label>Estilo rápido</label>
+          <div class="presets">
+            <button class="preset-btn" onclick="setPreset(this, 'pintura a óleo impressionista estilo Van Gogh')">🎨 Van Gogh</button>
+            <button class="preset-btn" onclick="setPreset(this, 'anime japonês estilo Studio Ghibli, cores vibrantes')">🌸 Anime</button>
+            <button class="preset-btn" onclick="setPreset(this, 'fotografia cyberpunk neon, cidade futurista à noite')">🌆 Cyberpunk</button>
+            <button class="preset-btn" onclick="setPreset(this, 'aquarela artística, pinceladas suaves e cores pastel')">💧 Aquarela</button>
+            <button class="preset-btn" onclick="setPreset(this, 'foto 4K ultra realista, iluminação profissional')">📸 HD Real</button>
+            <button class="preset-btn" onclick="setPreset(this, 'desenho a lápis preto e branco, sketch artístico detalhado')">✏️ Sketch</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Modelo</label>
+          <select id="modelSelect">
+            <option value="sdxl">SDXL — Qualidade padrão (1 crédito)</option>
+            <option value="sdxl-refiner">SDXL Refiner — Alta qualidade (2 créditos)</option>
+            <option value="stable-diffusion-3">SD3 — Máxima qualidade HD (3 créditos)</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="strength-row">
+            <label style="margin:0">Força da transformação</label>
+            <span class="strength-value" id="strengthValue">75%</span>
+          </div>
+          <input type="range" min="10" max="100" value="75" id="strengthRange"
+            oninput="document.getElementById('strengthValue').textContent = this.value + '%'">
+        </div>
+      </div>
+
+      <!-- DIREITA: Resultado -->
+      <div>
+        <div class="upload-label">Resultado</div>
+        <div class="result-zone" id="resultZone">
+          <div class="result-placeholder" id="resultPlaceholder">
+            <div class="icon">✨</div>
+            <p>Sua imagem<br>transformada aparece aqui</p>
+          </div>
+          <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <div class="loader-text" id="loaderText">Processando sua imagem...</div>
+            <div class="loader-bar"><div class="loader-bar-fill" id="loaderFill"></div></div>
+          </div>
+          <img class="output" id="outputImg" style="display:none">
+          <div class="result-actions" id="resultActions">
+            <a class="btn-sm" id="downloadBtn" download="morph-resultado.png">⬇ Baixar HD</a>
+            <button class="btn-sm" onclick="resetResult()">✕ Limpar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GERAR -->
+    <button class="btn-generate" id="generateBtn" onclick="generate()">
+      <span>⚡ Transformar imagem</span>
+    </button>
+    <p class="credit-info">Consome <strong id="creditCost">1 crédito</strong> por geração · Você tem <strong id="creditsInfo">5 créditos</strong></p>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="history-section" id="historySection" style="display:none">
+    <div class="section-title">Gerações recentes</div>
+    <div class="history-grid" id="historyGrid"></div>
+  </div>
+</main>
+
+<!-- MODAL COMPRAR -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Comprar créditos</h2>
+    <p>Cada crédito = 1 transformação. Créditos nunca expiram.</p>
+    <div class="plans">
+      <div class="plan selected" onclick="selectPlan(this, 10, 'R$ 9,90')" data-credits="10" data-price="R$ 9,90">
+        <div class="plan-left">
+          <div class="plan-name">⚡ Starter</div>
+          <div class="plan-desc">10 créditos — R$ 0,99/cada</div>
+        </div>
+        <div class="plan-price">R$ 9,90</div>
+      </div>
+      <div class="plan" onclick="selectPlan(this, 50, 'R$ 34,90')" data-credits="50" data-price="R$ 34,90">
+        <div class="plan-left">
+          <div class="plan-name">🚀 Popular</div>
+          <div class="plan-desc">50 créditos — R$ 0,69/cada · Economize 30%</div>
+        </div>
+        <div class="plan-price">R$ 34,90</div>
+      </div>
+      <div class="plan" onclick="selectPlan(this, 150, 'R$ 79,90')" data-credits="150" data-price="R$ 79,90">
+        <div class="plan-left">
+          <div class="plan-name">💎 Pro</div>
+          <div class="plan-desc">150 créditos — R$ 0,53/cada · Economize 46%</div>
+        </div>
+        <div class="plan-price">R$ 79,90</div>
+      </div>
+    </div>
+    <button class="btn-checkout" onclick="checkout()">Pagar com Stripe →</button>
+    <button class="btn-close" onclick="closeModal()">Cancelar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let credits = 5;
+  let selectedFile = null;
+  let selectedPlanCredits = 10;
+  let selectedPlanPrice = 'R$ 9,90';
+  const history = [];
+
+  // UPLOAD
+  function handleFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    const zone = document.getElementById('uploadZone');
+    let img = zone.querySelector('img.preview');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'preview';
+      zone.appendChild(img);
+    }
+    img.src = url;
+    showToast('✓ Imagem carregada!', 'success');
+  }
+
+  // DRAG
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      let img = zone.querySelector('img.preview');
+      if (!img) { img = document.createElement('img'); img.className = 'preview'; zone.appendChild(img); }
+      img.src = url;
+      showToast('✓ Imagem carregada!', 'success');
+    }
+  });
+
+  // PRESET
+  function setPreset(btn, text) {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('promptInput').value = text;
+  }
+
+  // MODEL COST
+  document.getElementById('modelSelect').addEventListener('change', function() {
+    const costs = { 'sdxl': 1, 'sdxl-refiner': 2, 'stable-diffusion-3': 3 };
+    const cost = costs[this.value];
+    document.getElementById('creditCost').textContent = cost + (cost > 1 ? ' créditos' : ' crédito');
+  });
+
+  // GENERATE
+  async function generate() {
+    if (!selectedFile) { showToast('⚠ Selecione uma imagem primeiro', 'error'); return; }
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) { showToast('⚠ Descreva a transformação desejada', 'error'); return; }
+
+    const costs = { 'sdxl': 1, 'sdxl-refiner': 2, 'stable-diffusion-3': 3 };
+    const model = document.getElementById('modelSelect').value;
+    const cost = costs[model];
+
+    if (credits < cost) {
+      openModal();
+      showToast('⚠ Créditos insuficientes!', 'error');
+      return;
+    }
+
+    // UI loading
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('resultPlaceholder').style.display = 'none';
+    document.getElementById('outputImg').style.display = 'none';
+    document.getElementById('resultActions').style.display = 'none';
+    const loader = document.getElementById('loader');
+    loader.classList.add('active');
+
+    // Simula progresso
+    const messages = ['Carregando imagem...', 'Aplicando transformação...', 'Refinando detalhes...', 'Finalizando em HD...'];
+    let progress = 0;
+    let msgIdx = 0;
+    const fill = document.getElementById('loaderFill');
+    const loaderText = document.getElementById('loaderText');
+
+    const interval = setInterval(() => {
+      progress = Math.min(progress + Math.random() * 12, 92);
+      fill.style.width = progress + '%';
+      if (progress > 25 && msgIdx === 0) { loaderText.textContent = messages[1]; msgIdx = 1; }
+      if (progress > 55 && msgIdx === 1) { loaderText.textContent = messages[2]; msgIdx = 2; }
+      if (progress > 80 && msgIdx === 2) { loaderText.textContent = messages[3]; msgIdx = 3; }
+    }, 400);
+
+    try {
+      // CHAMADA REAL À API DO BACKEND
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      formData.append('prompt', prompt);
+      formData.append('model', model);
+      formData.append('strength', document.getElementById('strengthRange').value / 100);
+
+      const res = await fetch('/api/transform', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      clearInterval(interval);
+      fill.style.width = '100%';
+
+      setTimeout(() => {
+        loader.classList.remove('active');
+        document.getElementById('generateBtn').disabled = false;
+
+        if (data.success) {
+          credits -= cost;
+          updateCredits();
+
+          const outputImg = document.getElementById('outputImg');
+          outputImg.src = data.imageUrl;
+          outputImg.style.display = 'block';
+          document.getElementById('downloadBtn').href = data.imageUrl;
+          document.getElementById('resultActions').style.display = 'flex';
+
+          addToHistory(data.imageUrl);
+          showToast('✓ Imagem transformada com sucesso!', 'success');
+        } else {
+          document.getElementById('resultPlaceholder').style.display = 'flex';
+          showToast('✗ ' + (data.error || 'Erro ao processar'), 'error');
+        }
+        fill.style.width = '0%';
+      }, 500);
+
+    } catch (err) {
+      clearInterval(interval);
+      loader.classList.remove('active');
+      document.getElementById('resultPlaceholder').style.display = 'flex';
+      document.getElementById('generateBtn').disabled = false;
+      showToast('✗ Erro de conexão com o servidor', 'error');
+      fill.style.width = '0%';
+    }
+  }
+
+  function resetResult() {
+    document.getElementById('outputImg').style.display = 'none';
+    document.getElementById('resultActions').style.display = 'none';
+    document.getElementById('resultPlaceholder').style.display = 'flex';
+  }
+
+  function updateCredits() {
+    document.getElementById('creditsDisplay').textContent = credits;
+    document.getElementById('creditsInfo').textContent = credits + ' crédito' + (credits !== 1 ? 's' : '');
+  }
+
+  function addToHistory(url) {
+    history.unshift(url);
+    const section = document.getElementById('historySection');
+    const grid = document.getElementById('historyGrid');
+    section.style.display = 'block';
+    grid.innerHTML = '';
+    history.slice(0, 8).forEach(imgUrl => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      const img = document.createElement('img');
+      img.src = imgUrl;
+      item.appendChild(img);
+      item.onclick = () => {
+        document.getElementById('outputImg').src = imgUrl;
+        document.getElementById('outputImg').style.display = 'block';
+        document.getElementById('resultPlaceholder').style.display = 'none';
+        document.getElementById('resultActions').style.display = 'flex';
+        document.getElementById('downloadBtn').href = imgUrl;
+      };
+      grid.appendChild(item);
+    });
+  }
+
+  // MODAL
+  function openModal() { document.getElementById('modalOverlay').classList.add('active'); }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  function selectPlan(el, c, p) {
+    document.querySelectorAll('.plan').forEach(pl => pl.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPlanCredits = c;
+    selectedPlanPrice = p;
+  }
+
+  async function checkout() {
+    showToast('Redirecionando para o Stripe...', 'success');
+    closeModal();
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credits: selectedPlanCredits, price: selectedPlanPrice })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // DEMO: adiciona créditos localmente
+      credits += selectedPlanCredits;
+      updateCredits();
+      showToast(`✓ +${selectedPlanCredits} créditos adicionados!`, 'success');
+    }
+  }
+
+  // TOAST
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type;
+    void t.offsetWidth;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
