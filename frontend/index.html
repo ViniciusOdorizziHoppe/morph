@@ -4,683 +4,837 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MORPH — Transforme qualquer imagem</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #080810;
-    --surface: #0f0f1a;
-    --border: #1e1e35;
-    --accent: #7c3aed;
-    --accent2: #06b6d4;
-    --text: #e8e8f0;
-    --muted: #6b6b8a;
-    --success: #10b981;
-    --error: #ef4444;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Background grid */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Glow blob */
-  body::after {
-    content: '';
-    position: fixed;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 800px;
-    height: 600px;
-    background: radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* NAVBAR */
-  nav {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 40px;
-    background: rgba(8,8,16,0.8);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 1.4rem;
-    letter-spacing: 0.1em;
-    background: linear-gradient(135deg, #a78bfa, #06b6d4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .nav-credits {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-
-  .nav-credits span {
-    color: #a78bfa;
-    font-weight: 600;
-  }
-
-  .btn-buy {
-    background: linear-gradient(135deg, var(--accent), #5b21b6);
-    color: white;
-    border: none;
-    border-radius: 100px;
-    padding: 10px 22px;
-    font-size: 0.85rem;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-buy:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 25px rgba(124,58,237,0.4);
-  }
-
-  /* MAIN */
-  main {
-    position: relative;
-    z-index: 1;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 120px 24px 60px;
-  }
-
-  /* HERO */
-  .hero {
-    text-align: center;
-    margin-bottom: 64px;
-    animation: fadeUp 0.8s ease both;
-  }
-
-  .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(124,58,237,0.1);
-    border: 1px solid rgba(124,58,237,0.3);
-    border-radius: 100px;
-    padding: 6px 14px;
-    font-size: 0.78rem;
-    color: #a78bfa;
-    margin-bottom: 24px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  .hero h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(2.5rem, 6vw, 4.5rem);
-    font-weight: 800;
-    line-height: 1.05;
-    margin-bottom: 20px;
-    letter-spacing: -0.02em;
-  }
-
-  .hero h1 em {
-    font-style: normal;
-    background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .hero p {
-    font-size: 1.1rem;
-    color: var(--muted);
-    max-width: 500px;
-    margin: 0 auto;
-    line-height: 1.7;
-  }
-
-  /* APP CARD */
-  .app-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 40px;
-    animation: fadeUp 0.8s ease 0.2s both;
-  }
-
-  .columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-    margin-bottom: 32px;
-  }
-
-  @media (max-width: 700px) {
-    .columns { grid-template-columns: 1fr; }
-    nav { padding: 16px 20px; }
-    .app-card { padding: 24px; }
-  }
-
-  /* UPLOAD ZONE */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: 16px;
-    aspect-ratio: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: hidden;
-    background: rgba(124,58,237,0.03);
-  }
-
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(124,58,237,0.07);
-  }
-
-  .upload-zone input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  .upload-icon {
-    width: 48px;
-    height: 48px;
-    background: rgba(124,58,237,0.15);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-  }
-
-  .upload-zone p {
-    font-size: 0.9rem;
-    color: var(--muted);
-    text-align: center;
-  }
-
-  .upload-zone strong {
-    color: #a78bfa;
-    font-weight: 500;
-  }
-
-  .upload-zone img.preview {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 14px;
-  }
-
-  .upload-label {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 10px;
-  }
-
-  /* RESULT ZONE */
-  .result-zone {
-    border: 2px solid var(--border);
-    border-radius: 16px;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-    background: rgba(6,182,212,0.03);
-  }
-
-  .result-placeholder {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-
-  .result-placeholder .icon { font-size: 2.5rem; margin-bottom: 10px; }
-
-  .result-zone img.output {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 14px;
-  }
-
-  .result-actions {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    display: flex;
-    gap: 8px;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .result-zone:hover .result-actions { opacity: 1; }
-
-  .btn-sm {
-    background: rgba(8,8,16,0.9);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
-    transition: all 0.2s;
-    text-decoration: none;
-    display: inline-block;
-  }
-
-  .btn-sm:hover { border-color: var(--accent); color: #a78bfa; }
-
-  /* LOADER */
-  .loader {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .loader.active { display: flex; }
-
-  .spinner {
-    width: 48px;
-    height: 48px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  .loader-text {
-    font-size: 0.85rem;
-    color: var(--muted);
-    text-align: center;
-  }
-
-  .loader-bar {
-    width: 160px;
-    height: 3px;
-    background: var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-
-  .loader-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    width: 0%;
-    transition: width 0.5s ease;
-  }
-
-  /* CONTROLS */
-  .controls { display: flex; flex-direction: column; gap: 20px; }
-
-  label {
-    display: block;
-    font-family: 'Syne', sans-serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 8px;
-  }
-
-  textarea, select, input[type=range] {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.9rem;
-    transition: border-color 0.2s;
-    outline: none;
-  }
-
-  textarea {
-    padding: 14px 16px;
-    resize: none;
-    height: 110px;
-    line-height: 1.6;
-  }
-
-  textarea:focus, select:focus { border-color: var(--accent); }
-
-  select {
-    padding: 12px 16px;
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b8a' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
-  }
-
-  .strength-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .strength-value {
-    font-size: 0.9rem;
-    color: #a78bfa;
-    font-weight: 500;
-  }
-
-  input[type=range] {
-    border: none;
-    height: 4px;
-    padding: 0;
-    cursor: pointer;
-    accent-color: var(--accent);
-    border-radius: 10px;
-  }
-
-  /* PRESETS */
-  .presets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .preset-btn {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 6px 14px;
-    font-size: 0.8rem;
-    color: var(--muted);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: 'DM Sans', sans-serif;
-  }
-
-  .preset-btn:hover, .preset-btn.active {
-    border-color: var(--accent);
-    color: #a78bfa;
-    background: rgba(124,58,237,0.1);
-  }
-
-  /* GENERATE BTN */
-  .btn-generate {
-    width: 100%;
-    padding: 18px;
-    background: linear-gradient(135deg, var(--accent), #5b21b6);
-    border: none;
-    border-radius: 14px;
-    color: white;
-    font-family: 'Syne', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-generate::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, #5b21b6, var(--accent2));
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .btn-generate:hover::before { opacity: 1; }
-  .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(124,58,237,0.5); }
-  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-
-  .btn-generate span { position: relative; z-index: 1; }
-
-  /* CREDIT INFO */
-  .credit-info {
-    text-align: center;
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-top: -8px;
-  }
-
-  .credit-info strong { color: #a78bfa; }
-
-  /* MODAL */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(8px);
-    z-index: 200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-
-  .modal-overlay.active { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 40px;
-    max-width: 480px;
-    width: 100%;
-    animation: scaleIn 0.3s ease;
-  }
-
-  .modal h2 {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.5rem;
-    font-weight: 800;
-    margin-bottom: 8px;
-  }
-
-  .modal p { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
-
-  .plans {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-
-  .plan {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 20px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .plan:hover, .plan.selected {
-    border-color: var(--accent);
-    background: rgba(124,58,237,0.08);
-  }
-
-  .plan-left { display: flex; flex-direction: column; gap: 3px; }
-  .plan-name { font-weight: 600; font-size: 0.95rem; }
-  .plan-desc { font-size: 0.8rem; color: var(--muted); }
-  .plan-price { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; color: #a78bfa; }
-
-  .btn-checkout {
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(135deg, var(--accent), #5b21b6);
-    border: none;
-    border-radius: 12px;
-    color: white;
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 12px;
-  }
-
-  .btn-checkout:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
-
-  .btn-close {
-    width: 100%;
-    padding: 12px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--muted);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-close:hover { border-color: var(--muted); color: var(--text); }
-
-  /* TOAST */
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 12px 24px;
-    font-size: 0.85rem;
-    z-index: 300;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    white-space: nowrap;
-  }
-
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.success { border-color: var(--success); color: var(--success); }
-  .toast.error { border-color: var(--error); color: var(--error); }
-
-  /* HISTORY */
-  .history-section {
-    margin-top: 48px;
-    animation: fadeUp 0.8s ease 0.4s both;
-  }
-
-  .section-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 20px;
-  }
-
-  .history-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
-  }
-
-  .history-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    cursor: pointer;
-    transition: all 0.2s;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-align: center;
-  }
-
-  .history-item:hover { border-color: var(--accent); transform: scale(1.02); }
-
-  .history-item img { width: 100%; height: 100%; object-fit: cover; }
-
-  /* ANIMATIONS */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.9); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
+:root {
+  --bg: #07070f;
+  --surface: #0e0e1c;
+  --surface2: #13132a;
+  --border: #1c1c35;
+  --accent: #7c3aed;
+  --accent2: #06b6d4;
+  --text: #e8e8f0;
+  --muted: #6b6b8a;
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* AUTH OVERLAY */
+#authOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7,7,15,0.95);
+  backdrop-filter: blur(20px);
+  padding: 24px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.auth-logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, #a78bfa, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.auth-subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 32px;
+}
+
+.auth-tabs {
+  display: flex;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 28px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.2s;
+  border: none;
+  background: none;
+}
+
+.auth-tab.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
+.auth-form.hidden { display: none; }
+
+.input-group { display: flex; flex-direction: column; gap: 6px; }
+
+.input-label {
+  font-size: 0.78rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.auth-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.auth-input:focus { border-color: var(--accent); }
+
+.btn-auth {
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.btn-auth:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+.btn-auth:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.auth-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--error);
+  display: none;
+}
+
+.auth-error.show { display: block; }
+
+.auth-free-badge {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.auth-free-badge strong { color: var(--success); }
+
+/* NAV */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(7,7,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  background: linear-gradient(135deg, #a78bfa, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-right { display: flex; align-items: center; gap: 12px; }
+
+.nav-user { display: flex; align-items: center; gap: 10px; }
+
+.nav-nome { font-size: 0.85rem; color: var(--muted); }
+
+.nav-credits {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.nav-credits span { color: #a78bfa; font-weight: 600; }
+
+.btn-comprar {
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  color: white;
+  border: none;
+  border-radius: 100px;
+  padding: 9px 20px;
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-comprar:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.4); }
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 7px 14px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover { border-color: var(--error); color: var(--error); }
+
+/* MAIN */
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 100px 24px 60px;
+}
+
+/* HERO */
+.hero {
+  text-align: center;
+  margin-bottom: 56px;
+  animation: fadeUp 0.8s ease both;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  color: #a78bfa;
+  margin-bottom: 20px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 460px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* APP CARD */
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px;
+  animation: fadeUp 0.8s ease 0.2s both;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 680px) {
+  .columns { grid-template-columns: 1fr; }
+  nav { padding: 14px 18px; }
+  .app-card { padding: 20px; }
+  .nav-nome { display: none; }
+}
+
+/* UPLOAD */
+.col-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  background: rgba(124,58,237,0.02);
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(124,58,237,0.07);
+}
+
+.upload-zone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(124,58,237,0.12);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.upload-zone p {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.upload-zone strong { color: #a78bfa; font-weight: 500; }
+
+.upload-zone img.preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+/* RESULT */
+.result-zone {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: rgba(6,182,212,0.02);
+}
+
+.result-placeholder {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.result-placeholder .icon { font-size: 2.2rem; margin-bottom: 8px; }
+
+.result-zone img.output {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.result-actions {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.result-zone:hover .result-actions { opacity: 1; }
+
+.btn-sm {
+  background: rgba(7,7,15,0.9);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-sm:hover { border-color: var(--accent); color: #a78bfa; }
+
+/* LOADER */
+.loader { display: none; flex-direction: column; align-items: center; gap: 14px; }
+.loader.active { display: flex; }
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loader-text { font-size: 0.82rem; color: var(--muted); text-align: center; }
+
+.loader-bar {
+  width: 140px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.loader-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 10px;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+/* CONTROLS */
+.controls { display: flex; flex-direction: column; gap: 18px; }
+
+label {
+  display: block;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+textarea, select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+textarea {
+  padding: 12px 14px;
+  resize: none;
+  height: 100px;
+  line-height: 1.6;
+}
+
+textarea:focus, select:focus { border-color: var(--accent); }
+
+select {
+  padding: 11px 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b8a' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.strength-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.strength-value { font-size: 0.88rem; color: #a78bfa; font-weight: 500; }
+
+input[type=range] {
+  width: 100%;
+  border: none;
+  height: 4px;
+  padding: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+  border-radius: 10px;
+  background: var(--border);
+}
+
+.presets { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.preset-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 5px 13px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.preset-btn:hover, .preset-btn.active {
+  border-color: var(--accent);
+  color: #a78bfa;
+  background: rgba(124,58,237,0.1);
+}
+
+/* GENERATE BTN */
+.btn-generate {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  border: none;
+  border-radius: 14px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-generate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #5b21b6, var(--accent2));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.btn-generate:hover::before { opacity: 1; }
+.btn-generate:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(124,58,237,0.5); }
+.btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-generate span { position: relative; z-index: 1; }
+
+.credit-info {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: -6px;
+}
+
+.credit-info strong { color: #a78bfa; }
+
+/* HISTORY */
+.history-section {
+  margin-top: 44px;
+  animation: fadeUp 0.8s ease 0.4s both;
+}
+
+.section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.history-item:hover { border-color: var(--accent); transform: scale(1.03); }
+.history-item img { width: 100%; height: 100%; object-fit: cover; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px;
+  max-width: 460px;
+  width: 100%;
+  animation: scaleIn 0.3s ease;
+}
+
+.modal h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.modal p { color: var(--muted); font-size: 0.88rem; margin-bottom: 24px; }
+
+.plans { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+.plan {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plan:hover, .plan.selected {
+  border-color: var(--accent);
+  background: rgba(124,58,237,0.08);
+}
+
+.plan-name { font-weight: 600; font-size: 0.9rem; }
+.plan-desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.plan-price { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; color: #a78bfa; }
+
+.btn-checkout {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 10px;
+}
+
+.btn-checkout:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+
+.btn-close-modal {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-close-modal:hover { border-color: var(--muted); color: var(--text); }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 10px 22px;
+  font-size: 0.82rem;
+  z-index: 300;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: var(--success); color: var(--success); }
+.toast.error { border-color: var(--error); color: var(--error); }
+
+/* ANIMATIONS */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
 </style>
 </head>
 <body>
 
+<!-- AUTH -->
+<div id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-logo">MORPH</div>
+    <p class="auth-subtitle">IA que transforma qualquer imagem</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Entrar</button>
+      <button class="auth-tab" onclick="switchTab('cadastro')">Criar conta</button>
+    </div>
+
+    <!-- LOGIN -->
+    <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+      <div class="auth-error" id="loginError"></div>
+      <div class="input-group">
+        <span class="input-label">Email</span>
+        <input class="auth-input" type="email" id="loginEmail" placeholder="seu@email.com" required>
+      </div>
+      <div class="input-group">
+        <span class="input-label">Senha</span>
+        <input class="auth-input" type="password" id="loginSenha" placeholder="••••••••" required>
+      </div>
+      <button class="btn-auth" type="submit" id="loginBtn">Entrar</button>
+    </form>
+
+    <!-- CADASTRO -->
+    <form class="auth-form hidden" id="cadastroForm" onsubmit="handleCadastro(event)">
+      <div class="auth-error" id="cadastroError"></div>
+      <div class="input-group">
+        <span class="input-label">Nome</span>
+        <input class="auth-input" type="text" id="cadastroNome" placeholder="Seu nome" required>
+      </div>
+      <div class="input-group">
+        <span class="input-label">Email</span>
+        <input class="auth-input" type="email" id="cadastroEmail" placeholder="seu@email.com" required>
+      </div>
+      <div class="input-group">
+        <span class="input-label">Senha</span>
+        <input class="auth-input" type="password" id="cadastroSenha" placeholder="Mínimo 6 caracteres" required minlength="6">
+      </div>
+      <button class="btn-auth" type="submit" id="cadastroBtn">Criar conta grátis</button>
+      <p class="auth-free-badge">✦ Ganhe <strong>5 créditos grátis</strong> ao se cadastrar</p>
+    </form>
+  </div>
+</div>
+
+<!-- NAV -->
 <nav>
   <div class="logo">MORPH</div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="nav-credits">⚡ <span id="creditsDisplay">5</span> créditos</div>
-    <button class="btn-buy" onclick="openModal()">Comprar créditos</button>
+  <div class="nav-right">
+    <div class="nav-user">
+      <span class="nav-nome" id="navNome"></span>
+      <div class="nav-credits">⚡ <span id="creditsDisplay">0</span> créditos</div>
+    </div>
+    <button class="btn-comprar" onclick="openModal()">Comprar créditos</button>
+    <button class="btn-logout" onclick="logout()">Sair</button>
   </div>
 </nav>
 
@@ -688,46 +842,37 @@
   <div class="hero">
     <div class="hero-badge">✦ Powered by AI</div>
     <h1>Transforme qualquer<br>imagem em <em>algo novo</em></h1>
-    <p>Envie uma foto, descreva o que quer ver e deixe a IA fazer a mágica. Resultados em HD.</p>
+    <p>Envie uma foto, descreva o que quer ver e deixe a IA fazer a mágica.</p>
   </div>
 
   <div class="app-card">
     <div class="columns">
-      <!-- ESQUERDA: Upload + Controles -->
+      <!-- ESQUERDA -->
       <div class="controls">
         <div>
-          <div class="upload-label">Imagem original</div>
+          <div class="col-label">Imagem original</div>
           <div class="upload-zone" id="uploadZone">
             <input type="file" accept="image/*" id="fileInput" onchange="handleFile(this)">
             <div class="upload-icon">🖼️</div>
-            <p><strong>Clique ou arraste</strong><br>JPG, PNG, WebP até 10MB</p>
+            <p><strong>Clique ou arraste</strong><br>JPG, PNG até 10MB</p>
           </div>
         </div>
 
         <div>
           <label>Transformação</label>
-          <textarea id="promptInput" placeholder="Ex: transformar em pintura a óleo estilo Van Gogh, céu estrelado dramático..."></textarea>
+          <textarea id="promptInput" placeholder="Ex: pintura a óleo estilo Van Gogh, céu dramático..."></textarea>
         </div>
 
         <div>
           <label>Estilo rápido</label>
           <div class="presets">
-            <button class="preset-btn" onclick="setPreset(this, 'pintura a óleo impressionista estilo Van Gogh')">🎨 Van Gogh</button>
-            <button class="preset-btn" onclick="setPreset(this, 'anime japonês estilo Studio Ghibli, cores vibrantes')">🌸 Anime</button>
-            <button class="preset-btn" onclick="setPreset(this, 'fotografia cyberpunk neon, cidade futurista à noite')">🌆 Cyberpunk</button>
-            <button class="preset-btn" onclick="setPreset(this, 'aquarela artística, pinceladas suaves e cores pastel')">💧 Aquarela</button>
-            <button class="preset-btn" onclick="setPreset(this, 'foto 4K ultra realista, iluminação profissional')">📸 HD Real</button>
-            <button class="preset-btn" onclick="setPreset(this, 'desenho a lápis preto e branco, sketch artístico detalhado')">✏️ Sketch</button>
+            <button class="preset-btn" onclick="setPreset(this,'pintura a óleo impressionista estilo Van Gogh')">🎨 Van Gogh</button>
+            <button class="preset-btn" onclick="setPreset(this,'anime japonês estilo Studio Ghibli, cores vibrantes')">🌸 Anime</button>
+            <button class="preset-btn" onclick="setPreset(this,'fotografia cyberpunk neon, cidade futurista à noite')">🌆 Cyberpunk</button>
+            <button class="preset-btn" onclick="setPreset(this,'aquarela artística, pinceladas suaves e cores pastel')">💧 Aquarela</button>
+            <button class="preset-btn" onclick="setPreset(this,'foto 4K ultra realista, iluminação profissional de estúdio')">📸 HD Real</button>
+            <button class="preset-btn" onclick="setPreset(this,'desenho a lápis preto e branco, sketch artístico detalhado')">✏️ Sketch</button>
           </div>
-        </div>
-
-        <div>
-          <label>Modelo</label>
-          <select id="modelSelect">
-            <option value="sdxl">SDXL — Qualidade padrão (1 crédito)</option>
-            <option value="sdxl-refiner">SDXL Refiner — Alta qualidade (2 créditos)</option>
-            <option value="stable-diffusion-3">SD3 — Máxima qualidade HD (3 créditos)</option>
-          </select>
         </div>
 
         <div>
@@ -736,13 +881,13 @@
             <span class="strength-value" id="strengthValue">75%</span>
           </div>
           <input type="range" min="10" max="100" value="75" id="strengthRange"
-            oninput="document.getElementById('strengthValue').textContent = this.value + '%'">
+            oninput="document.getElementById('strengthValue').textContent=this.value+'%'">
         </div>
       </div>
 
-      <!-- DIREITA: Resultado -->
+      <!-- DIREITA -->
       <div>
-        <div class="upload-label">Resultado</div>
+        <div class="col-label">Resultado</div>
         <div class="result-zone" id="resultZone">
           <div class="result-placeholder" id="resultPlaceholder">
             <div class="icon">✨</div>
@@ -750,23 +895,22 @@
           </div>
           <div class="loader" id="loader">
             <div class="spinner"></div>
-            <div class="loader-text" id="loaderText">Processando sua imagem...</div>
+            <div class="loader-text" id="loaderText">Processando...</div>
             <div class="loader-bar"><div class="loader-bar-fill" id="loaderFill"></div></div>
           </div>
           <img class="output" id="outputImg" style="display:none">
-          <div class="result-actions" id="resultActions">
-            <a class="btn-sm" id="downloadBtn" download="morph-resultado.png">⬇ Baixar HD</a>
-            <button class="btn-sm" onclick="resetResult()">✕ Limpar</button>
+          <div class="result-actions" id="resultActions" style="display:none">
+            <a class="btn-sm" id="downloadBtn" download="morph.jpg" target="_blank">⬇ Baixar</a>
+            <button class="btn-sm" onclick="resetResult()">✕</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- GERAR -->
     <button class="btn-generate" id="generateBtn" onclick="generate()">
       <span>⚡ Transformar imagem</span>
     </button>
-    <p class="credit-info">Consome <strong id="creditCost">1 crédito</strong> por geração · Você tem <strong id="creditsInfo">5 créditos</strong></p>
+    <p class="credit-info">Consome <strong>1 crédito</strong> por geração · Você tem <strong id="creditsInfo">0 créditos</strong></p>
   </div>
 
   <!-- HISTÓRICO -->
@@ -780,311 +924,374 @@
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h2>Comprar créditos</h2>
-    <p>Cada crédito = 1 transformação. Créditos nunca expiram.</p>
+    <p>Cada crédito = 1 transformação. Nunca expiram.</p>
     <div class="plans">
-      <div class="plan selected" onclick="selectPlan(this, 10, 'R$ 9,90')" data-credits="10" data-price="R$ 9,90">
-        <div class="plan-left">
-          <div class="plan-name">⚡ Starter</div>
-          <div class="plan-desc">10 créditos — R$ 0,99/cada</div>
-        </div>
+      <div class="plan selected" onclick="selectPlan(this,10,'R$ 9,90')">
+        <div><div class="plan-name">⚡ Starter</div><div class="plan-desc">10 créditos — R$ 0,99/cada</div></div>
         <div class="plan-price">R$ 9,90</div>
       </div>
-      <div class="plan" onclick="selectPlan(this, 50, 'R$ 34,90')" data-credits="50" data-price="R$ 34,90">
-        <div class="plan-left">
-          <div class="plan-name">🚀 Popular</div>
-          <div class="plan-desc">50 créditos — R$ 0,69/cada · Economize 30%</div>
-        </div>
+      <div class="plan" onclick="selectPlan(this,50,'R$ 34,90')">
+        <div><div class="plan-name">🚀 Popular</div><div class="plan-desc">50 créditos — R$ 0,69/cada · -30%</div></div>
         <div class="plan-price">R$ 34,90</div>
       </div>
-      <div class="plan" onclick="selectPlan(this, 150, 'R$ 79,90')" data-credits="150" data-price="R$ 79,90">
-        <div class="plan-left">
-          <div class="plan-name">💎 Pro</div>
-          <div class="plan-desc">150 créditos — R$ 0,53/cada · Economize 46%</div>
-        </div>
+      <div class="plan" onclick="selectPlan(this,150,'R$ 79,90')">
+        <div><div class="plan-name">💎 Pro</div><div class="plan-desc">150 créditos — R$ 0,53/cada · -46%</div></div>
         <div class="plan-price">R$ 79,90</div>
       </div>
     </div>
-    <button class="btn-checkout" onclick="checkout()">Pagar com Stripe →</button>
-    <button class="btn-close" onclick="closeModal()">Cancelar</button>
+    <button class="btn-checkout" onclick="checkout()">Pagar agora →</button>
+    <button class="btn-close-modal" onclick="closeModal()">Cancelar</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  let credits = 5;
-  let selectedFile = null;
-  let selectedPlanCredits = 10;
-  let selectedPlanPrice = 'R$ 9,90';
-  const history = [];
+// ⚠️ IMPORTANTE: Atualize esta URL para a sua URL do Koyeb
+const API = 'https://realistic-viper-morph-82184336.koyeb.app'
 
-  // UPLOAD
-  function handleFile(input) {
-    const file = input.files[0];
-    if (!file) return;
-    selectedFile = file;
-    const url = URL.createObjectURL(file);
-    const zone = document.getElementById('uploadZone');
-    let img = zone.querySelector('img.preview');
-    if (!img) {
-      img = document.createElement('img');
-      img.className = 'preview';
-      zone.appendChild(img);
-    }
-    img.src = url;
-    showToast('✓ Imagem carregada!', 'success');
+let token = localStorage.getItem('morph_token')
+let usuario = JSON.parse(localStorage.getItem('morph_user') || 'null')
+let selectedFile = null
+let selectedPlanCredits = 10
+let selectedPlanPrice = 'R$ 9,90'
+let historyList = []
+
+// INIT
+window.addEventListener('load', () => {
+  if (token && usuario) {
+    showApp()
+    carregarHistorico()
   }
+})
 
-  // DRAG
-  const zone = document.getElementById('uploadZone');
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault();
-    zone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      selectedFile = file;
-      const url = URL.createObjectURL(file);
-      let img = zone.querySelector('img.preview');
-      if (!img) { img = document.createElement('img'); img.className = 'preview'; zone.appendChild(img); }
-      img.src = url;
-      showToast('✓ Imagem carregada!', 'success');
-    }
-  });
-
-  // PRESET
-  function setPreset(btn, text) {
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('promptInput').value = text;
-  }
-
-  // MODEL COST
-  document.getElementById('modelSelect').addEventListener('change', function() {
-    const costs = { 'sdxl': 1, 'sdxl-refiner': 2, 'stable-diffusion-3': 3 };
-    const cost = costs[this.value];
-    document.getElementById('creditCost').textContent = cost + (cost > 1 ? ' créditos' : ' crédito');
-  });
-
- async function generate(){
-
- const token = localStorage.getItem("token")
-
- if(!token){
-  alert("Faça login primeiro")
-  return
- }
-
- if(!selectedFile){
-  alert("Selecione uma imagem")
-  return
- }
-
- const prompt = document.getElementById("promptInput").value
- const model = document.getElementById("modelSelect").value
- const cost = 1
-
- // UI loading
- document.getElementById('generateBtn').disabled = true
- document.getElementById('resultPlaceholder').style.display = 'none'
- document.getElementById('outputImg').style.display = 'none'
- document.getElementById('resultActions').style.display = 'none'
-
- const loader = document.getElementById('loader')
- loader.classList.add('active')
-
- // progresso visual
- const messages = [
-  'Carregando imagem...',
-  'Aplicando transformação...',
-  'Refinando detalhes...',
-  'Finalizando em HD...'
- ]
-
- let progress = 0
- let msgIdx = 0
-
- const fill = document.getElementById('loaderFill')
- const loaderText = document.getElementById('loaderText')
-
- const interval = setInterval(() => {
-
-  progress = Math.min(progress + Math.random() * 12, 92)
-
-  fill.style.width = progress + '%'
-
-  if(progress > 25 && msgIdx === 0){
-   loaderText.textContent = messages[1]
-   msgIdx = 1
-  }
-
-  if(progress > 55 && msgIdx === 1){
-   loaderText.textContent = messages[2]
-   msgIdx = 2
-  }
-
-  if(progress > 80 && msgIdx === 2){
-   loaderText.textContent = messages[3]
-   msgIdx = 3
-  }
-
- },400)
-
- try{
-
-  const formData = new FormData()
-  formData.append("image", selectedFile)
-  formData.append("prompt", prompt)
-  formData.append("model", model)
-  formData.append("strength", document.getElementById('strengthRange').value / 100)
-
-  const res = await fetch(
-   "https://realistic-viper-morph-82184336.koyeb.app/api/transform",
-   {
-    method:"POST",
-    headers:{
-     Authorization:`Bearer ${token}`
-    },
-    body:formData
-   }
-  )
-
-  const data = await res.json()
-
-  clearInterval(interval)
-
-  fill.style.width = "100%"
-
-  setTimeout(()=>{
-
-   loader.classList.remove("active")
-   document.getElementById('generateBtn').disabled = false
-
-   if(data.success){
-
-    credits -= cost
-    updateCredits()
-
-    const outputImg = document.getElementById("outputImg")
-
-    outputImg.src = data.imageUrl
-    outputImg.style.display = "block"
-
-    document.getElementById("downloadBtn").href = data.imageUrl
-    document.getElementById("resultActions").style.display = "flex"
-
-    addToHistory(data.imageUrl)
-
-    showToast("✓ Imagem transformada com sucesso!","success")
-
-   }else{
-
-    document.getElementById('resultPlaceholder').style.display = 'flex'
-
-    showToast("✗ " + (data.error || "Erro ao processar"),"error")
-
-   }
-
-   fill.style.width = "0%"
-
-  },500)
-
- }catch(err){
-
-  clearInterval(interval)
-
-  loader.classList.remove("active")
-
-  document.getElementById('resultPlaceholder').style.display = 'flex'
-  document.getElementById('generateBtn').disabled = false
-
-  showToast("✗ Erro de conexão com o servidor","error")
-
-  fill.style.width = "0%"
-
- }
-
+// AUTH
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='cadastro')))
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login')
+  document.getElementById('cadastroForm').classList.toggle('hidden', tab !== 'cadastro')
 }
 
-  function resetResult() {
-    document.getElementById('outputImg').style.display = 'none';
-    document.getElementById('resultActions').style.display = 'none';
-    document.getElementById('resultPlaceholder').style.display = 'flex';
+async function handleLogin(e) {
+  e.preventDefault()
+  const btn = document.getElementById('loginBtn')
+  const errEl = document.getElementById('loginError')
+  btn.disabled = true
+  btn.textContent = 'Entrando...'
+  errEl.classList.remove('show')
+
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: document.getElementById('loginEmail').value,
+        senha: document.getElementById('loginSenha').value,
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Erro ao entrar')
+    salvarAuth(data)
+    showApp()
+    carregarHistorico()
+    showToast(`Bem-vindo, ${data.usuario.nome}!`, 'success')
+  } catch (err) {
+    errEl.textContent = err.message
+    errEl.classList.add('show')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Entrar'
   }
+}
 
-  function updateCredits() {
-    document.getElementById('creditsDisplay').textContent = credits;
-    document.getElementById('creditsInfo').textContent = credits + ' crédito' + (credits !== 1 ? 's' : '');
+async function handleCadastro(e) {
+  e.preventDefault()
+  const btn = document.getElementById('cadastroBtn')
+  const errEl = document.getElementById('cadastroError')
+  btn.disabled = true
+  btn.textContent = 'Criando conta...'
+  errEl.classList.remove('show')
+
+  try {
+    const res = await fetch(`${API}/api/auth/cadastro`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: document.getElementById('cadastroNome').value,
+        email: document.getElementById('cadastroEmail').value,
+        senha: document.getElementById('cadastroSenha').value,
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Erro ao criar conta')
+    salvarAuth(data)
+    showApp()
+    showToast('✓ Conta criada! Você ganhou 5 créditos grátis', 'success')
+  } catch (err) {
+    errEl.textContent = err.message
+    errEl.classList.add('show')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Criar conta grátis'
   }
+}
 
-  function addToHistory(url) {
-    history.unshift(url);
-    const section = document.getElementById('historySection');
-    const grid = document.getElementById('historyGrid');
-    section.style.display = 'block';
-    grid.innerHTML = '';
-    history.slice(0, 8).forEach(imgUrl => {
-      const item = document.createElement('div');
-      item.className = 'history-item';
-      const img = document.createElement('img');
-      img.src = imgUrl;
-      item.appendChild(img);
-      item.onclick = () => {
-        document.getElementById('outputImg').src = imgUrl;
-        document.getElementById('outputImg').style.display = 'block';
-        document.getElementById('resultPlaceholder').style.display = 'none';
-        document.getElementById('resultActions').style.display = 'flex';
-        document.getElementById('downloadBtn').href = imgUrl;
-      };
-      grid.appendChild(item);
-    });
+function salvarAuth(data) {
+  token = data.token
+  usuario = data.usuario
+  localStorage.setItem('morph_token', token)
+  localStorage.setItem('morph_user', JSON.stringify(usuario))
+}
+
+function showApp() {
+  document.getElementById('authOverlay').style.display = 'none'
+  document.getElementById('navNome').textContent = usuario.nome?.split(' ')[0] || ''
+  updateCreditsDisplay(usuario.creditos)
+}
+
+function logout() {
+  localStorage.removeItem('morph_token')
+  localStorage.removeItem('morph_user')
+  token = null
+  usuario = null
+  document.getElementById('authOverlay').style.display = 'flex'
+  document.getElementById('historySection').style.display = 'none'
+  historyList = []
+  resetResult()
+  document.getElementById('uploadZone').querySelector('img.preview')?.remove()
+  selectedFile = null
+}
+
+function updateCreditsDisplay(n) {
+  if (usuario) usuario.creditos = n
+  document.getElementById('creditsDisplay').textContent = n
+  document.getElementById('creditsInfo').textContent = n + ' crédito' + (n !== 1 ? 's' : '')
+}
+
+// UPLOAD
+function handleFile(input) {
+  const file = input.files[0]
+  if (!file) return
+  
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('⚠ Imagem muito grande. Máximo 10MB.', 'error')
+    return
   }
-
-  // MODAL
-  function openModal() { document.getElementById('modalOverlay').classList.add('active'); }
-  function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
-
-  document.getElementById('modalOverlay').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-  });
-
-  function selectPlan(el, c, p) {
-    document.querySelectorAll('.plan').forEach(pl => pl.classList.remove('selected'));
-    el.classList.add('selected');
-    selectedPlanCredits = c;
-    selectedPlanPrice = p;
+  
+  selectedFile = file
+  const url = URL.createObjectURL(file)
+  const zone = document.getElementById('uploadZone')
+  let img = zone.querySelector('img.preview')
+  if (!img) { 
+    img = document.createElement('img')
+    img.className = 'preview'
+    zone.appendChild(img)
   }
+  img.src = url
+  showToast('✓ Imagem carregada!', 'success')
+}
 
-  async function checkout() {
-    showToast('Redirecionando para o Stripe...', 'success');
-    closeModal();
-
-    try {
-      const res = await fetch('https://realistic-viper-morph-82184336.koyeb.app/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credits: selectedPlanCredits, price: selectedPlanPrice })
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      // DEMO: adiciona créditos localmente
-      credits += selectedPlanCredits;
-      updateCredits();
-      showToast(`✓ +${selectedPlanCredits} créditos adicionados!`, 'success');
+const zone = document.getElementById('uploadZone')
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over') })
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'))
+zone.addEventListener('drop', e => {
+  e.preventDefault()
+  zone.classList.remove('drag-over')
+  const file = e.dataTransfer.files[0]
+  if (file?.type.startsWith('image/')) {
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('⚠ Imagem muito grande. Máximo 10MB.', 'error')
+      return
     }
+    selectedFile = file
+    const url = URL.createObjectURL(file)
+    let img = zone.querySelector('img.preview')
+    if (!img) { 
+      img = document.createElement('img')
+      img.className = 'preview'
+      zone.appendChild(img)
+    }
+    img.src = url
+    showToast('✓ Imagem carregada!', 'success')
+  }
+})
+
+function setPreset(btn, text) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  document.getElementById('promptInput').value = text
+}
+
+// GENERATE
+async function generate() {
+  if (!selectedFile) { showToast('⚠ Selecione uma imagem', 'error'); return }
+  const prompt = document.getElementById('promptInput').value.trim()
+  if (!prompt) { showToast('⚠ Descreva a transformação', 'error'); return }
+  if (!usuario || usuario.creditos < 1) { 
+    openModal()
+    showToast('⚠ Créditos insuficientes!', 'error')
+    return
   }
 
-  // TOAST
-  function showToast(msg, type = '') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast ' + type;
-    void t.offsetWidth;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+  const btn = document.getElementById('generateBtn')
+  btn.disabled = true
+  document.getElementById('resultPlaceholder').style.display = 'none'
+  document.getElementById('outputImg').style.display = 'none'
+  document.getElementById('resultActions').style.display = 'none'
+  const loader = document.getElementById('loader')
+  loader.classList.add('active')
+
+  const messages = ['Enviando imagem...', 'Processando com IA...', 'Refinando detalhes...', 'Finalizando...']
+  let progress = 0, msgIdx = 0
+  const fill = document.getElementById('loaderFill')
+  const loaderText = document.getElementById('loaderText')
+
+  const interval = setInterval(() => {
+    progress = Math.min(progress + Math.random() * 8, 85)
+    fill.style.width = progress + '%'
+    if (progress > 20 && msgIdx === 0) { loaderText.textContent = messages[1]; msgIdx++ }
+    if (progress > 45 && msgIdx === 1) { loaderText.textContent = messages[2]; msgIdx++ }
+    if (progress > 70 && msgIdx === 2) { loaderText.textContent = messages[3]; msgIdx++ }
+  }, 800)
+
+  try {
+    const formData = new FormData()
+    formData.append('image', selectedFile)
+    formData.append('prompt', prompt)
+    formData.append('strength', document.getElementById('strengthRange').value / 100)
+
+    const res = await fetch(`${API}/api/transform`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    })
+    
+    const data = await res.json()
+
+    clearInterval(interval)
+    fill.style.width = '100%'
+
+    setTimeout(() => {
+      loader.classList.remove('active')
+      btn.disabled = false
+      fill.style.width = '0%'
+
+      if (data.success) {
+        updateCreditsDisplay(data.creditos)
+        const outputImg = document.getElementById('outputImg')
+        outputImg.src = data.imageUrl
+        outputImg.style.display = 'block'
+        document.getElementById('downloadBtn').href = data.imageUrl
+        document.getElementById('resultActions').style.display = 'flex'
+        addToHistory(data.imageUrl)
+        showToast('✓ Imagem transformada!', 'success')
+      } else {
+        document.getElementById('resultPlaceholder').style.display = 'flex'
+        showToast('✗ ' + (data.error || 'Erro ao processar'), 'error')
+        if (data.error?.includes('crédito') || data.error?.includes('Crédito')) {
+          openModal()
+        }
+      }
+    }, 500)
+
+  } catch (err) {
+    clearInterval(interval)
+    loader.classList.remove('active')
+    document.getElementById('resultPlaceholder').style.display = 'flex'
+    btn.disabled = false
+    fill.style.width = '0%'
+    console.error(err)
+    showToast('✗ Erro de conexão com servidor', 'error')
   }
+}
+
+function resetResult() {
+  document.getElementById('outputImg').style.display = 'none'
+  document.getElementById('resultActions').style.display = 'none'
+  document.getElementById('resultPlaceholder').style.display = 'flex'
+}
+
+// HISTÓRICO
+async function carregarHistorico() {
+  try {
+    const res = await fetch(`${API}/api/historico`, { 
+      headers: { Authorization: `Bearer ${token}` } 
+    })
+    if (!res.ok) throw new Error('Falha ao carregar')
+    const data = await res.json()
+    if (Array.isArray(data) && data.length > 0) {
+      historyList = data.map(g => g.imagemOutput)
+      renderHistory()
+    }
+  } catch (err) {
+    console.log('Erro ao carregar histórico:', err)
+  }
+}
+
+function addToHistory(url) {
+  historyList.unshift(url)
+  renderHistory()
+}
+
+function renderHistory() {
+  const section = document.getElementById('historySection')
+  const grid = document.getElementById('historyGrid')
+  if (historyList.length === 0) {
+    section.style.display = 'none'
+    return
+  }
+  section.style.display = 'block'
+  grid.innerHTML = ''
+  historyList.slice(0, 8).forEach(imgUrl => {
+    const item = document.createElement('div')
+    item.className = 'history-item'
+    const img = document.createElement('img')
+    img.src = imgUrl
+    img.loading = 'lazy'
+    item.appendChild(img)
+    item.onclick = () => {
+      document.getElementById('outputImg').src = imgUrl
+      document.getElementById('outputImg').style.display = 'block'
+      document.getElementById('resultPlaceholder').style.display = 'none'
+      document.getElementById('resultActions').style.display = 'flex'
+      document.getElementById('downloadBtn').href = imgUrl
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    grid.appendChild(item)
+  })
+}
+
+// MODAL
+function openModal() { document.getElementById('modalOverlay').classList.add('active') }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active') }
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal()
+})
+
+function selectPlan(el, c, p) {
+  document.querySelectorAll('.plan').forEach(pl => pl.classList.remove('selected'))
+  el.classList.add('selected')
+  selectedPlanCredits = c
+  selectedPlanPrice = p
+}
+
+async function checkout() {
+  showToast('Redirecionando para pagamento...', 'success')
+  closeModal()
+  // Implementar integração real com Stripe/MercadoPago aqui
+  showToast('Sistema de pagamento em breve!', 'success')
+}
+
+// TOAST
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = 'toast ' + type
+  void t.offsetWidth
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 3000)
+}
 </script>
 </body>
 </html>
