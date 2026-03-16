@@ -76,6 +76,15 @@ function auth(req, res, next) {
   }
 }
 
+// Função para converter stream para buffer
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 // CADASTRO
 app.post("/api/auth/cadastro", async (req, res) => {
   try {
@@ -165,7 +174,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// TRANSFORMAR IMAGEM - CORRIGIDO
+// TRANSFORMAR IMAGEM - CORRIGIDO PARA STREAM
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   let tempFile = req.file?.path;
   
@@ -194,7 +203,7 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
 
     console.log("Fazendo upload para Cloudinary...");
     
-    // Upload para Cloudinary
+    // Upload da imagem original para Cloudinary
     const cloudResult = await cloudinary.uploader.upload(tempFile, {
       folder: "morph_uploads",
       resource_type: "image"
@@ -210,7 +219,6 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     console.log("Enviando para Replicate...");
     
     const resultado = await queue.add(async () => {
-      // Usando o modelo correto img2img
       const output = await replicate.run(
         "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
         {
@@ -225,7 +233,8 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
           }
         }
       );
-      console.log("Replicate output:", output);
+      
+      console.log("Replicate output raw:", output);
       return output;
     });
 
@@ -233,19 +242,48 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
       throw new Error("Replicate não retornou resultado");
     }
 
-    const imageUrl = resultado[0];
+    // O resultado é um ReadableStream - precisamos converter para buffer
+    const stream = resultado[0];
+    console.log("Tipo do resultado:", typeof stream, stream.constructor.name);
+    
+    // Converte stream para buffer
+    const buffer = await streamToBuffer(stream);
+    console.log("Buffer size:", buffer.length);
+    
+    // Faz upload da imagem gerada para Cloudinary
+    console.log("Fazendo upload do resultado para Cloudinary...");
+    const resultUpload = await new Promise(async (resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "morph_results",
+          resource_type: "image"
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      
+      // Converte buffer para stream e faz upload
+      const { Readable } = await import('stream');
+      const readableStream = Readable.from([buffer]);
+      readableStream.pipe(uploadStream);
+    });
+    
+    const finalImageUrl = resultUpload.secure_url;
+    console.log("URL final:", finalImageUrl);
 
     // Salva no histórico
     await Geracao.create({
       usuario: req.userId,
       imagem: cloudResult.secure_url,
-      resultado: imageUrl,
+      resultado: finalImageUrl,
       prompt
     });
 
     res.json({
       success: true,
-      imageUrl: imageUrl,
+      imageUrl: finalImageUrl,
       creditos: user.creditos
     });
 
