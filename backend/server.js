@@ -4,7 +4,6 @@ import multer from 'multer'
 import Replicate from 'replicate'
 import rateLimit from 'express-rate-limit'
 import PQueue from 'p-queue'
-import sharp from 'sharp'
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago'
 import { v2 as cloudinary } from 'cloudinary'
 import dotenv from 'dotenv'
@@ -40,7 +39,7 @@ FILA DE GERAÇÃO
 ──────────────────────── */
 
 const queue = new PQueue({
-  concurrency: 2 // apenas 2 gerações ao mesmo tempo
+  concurrency: 2
 })
 
 /* ─────────────────────────
@@ -75,37 +74,26 @@ app.post('/api/transform', transformLimiter, upload.single('image'), async (req,
 
     const result = await queue.add(async () => {
 
-      /* compressão da imagem */
+      /* upload da imagem original */
 
-      const compressedPath = `${file.path}-compressed.jpg`
-
-      await sharp(file.path)
-        .resize(1024) 
-        .jpeg({ quality: 80 })
-        .toFile(compressedPath)
-
-      fs.unlinkSync(file.path)
-
-      /* upload cloudinary */
-
-      const uploadResult = await cloudinary.uploader.upload(compressedPath,{
+      const uploadResult = await cloudinary.uploader.upload(file.path,{
         folder:'morph/inputs'
       })
 
-      fs.unlinkSync(compressedPath)
+      fs.unlinkSync(file.path)
 
       const imageUrl = uploadResult.secure_url
 
       /* chamada IA */
 
       const output = await replicate.run(
-        'black-forest-labs/flux-dev',
+        "black-forest-labs/flux-schnell",
         {
           input:{
             image:imageUrl,
             prompt:prompt,
             strength:parseFloat(strength),
-            num_inference_steps:28, // reduz custo
+            num_inference_steps:28,
             guidance:3.5,
             output_format:'jpg',
             output_quality:90
@@ -250,8 +238,6 @@ app.post('/api/webhook', async (req,res)=>{
 
   res.sendStatus(200)
 })
-
-/* ───────────────────────── */
 
 const PORT = process.env.PORT || 3000
 
