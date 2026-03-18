@@ -17,10 +17,12 @@ const app = express();
 
 app.use(express.json());
 
-// CORS
+// CORS - PERMISSIVO
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
 }));
 
 // Cloudinary config
@@ -309,7 +311,6 @@ app.get("/api/admin/dashboard", auth, adminOnly, async (req, res) => {
     const visitantesTotais = await Visitante.countDocuments();
     const taxaConversao = visitantesTotais > 0 ? ((totalUsuarios / visitantesTotais) * 100).toFixed(2) : 0;
     
-    // Custo e lucro (R$ 0,55 por geração)
     const custoTotal = totalGeracoes * 0.55;
     const lucroTotal = (receitaTotal[0]?.total || 0) - custoTotal;
     
@@ -453,9 +454,15 @@ app.post("/api/track/visit", async (req, res) => {
   }
 });
 
-// ============== TRANSFORM IMAGE - PRESERVAÇÃO FACIAL ==============
+// ============== TRANSFORM IMAGE ==============
 
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
+  console.log("=== TRANSFORM STARTED ===");
+  console.log("User ID:", req.userId);
+  console.log("Prompt:", req.body.prompt);
+  console.log("Strength:", req.body.strength);
+  console.log("File received:", req.file ? "YES" : "NO");
+  
   let tempFile = req.file?.path;
   
   try {
@@ -466,6 +473,7 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     );
 
     if (!user) {
+      console.log("ERROR: No credits");
       if (tempFile) await fs.promises.unlink(tempFile).catch(() => {});
       return res.status(402).json({ 
         success: false, 
@@ -474,27 +482,27 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     }
 
     if (!req.file) {
+      console.log("ERROR: No file");
       return res.status(400).json({ success: false, error: "Nenhuma imagem enviada" });
     }
 
     const prompt = req.body.prompt?.trim() || "a person";
     const strength = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1.0);
 
-    console.log("Fazendo upload para Cloudinary...");
+    console.log("Uploading to Cloudinary...");
     
     const cloudResult = await cloudinary.uploader.upload(tempFile, {
       folder: "morph_uploads",
       resource_type: "image"
     });
 
-    console.log("Upload concluído:", cloudResult.secure_url);
+    console.log("Upload done:", cloudResult.secure_url);
 
     await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    console.log("Processando com SDXL + preservação facial...");
-
-    // ETAPA 1: Usar SDXL img2img para transformação base
+    console.log("Processing with SDXL...");
+    
     const resultado = await queue.add(async () => {
       const output = await replicate.run(
         "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
@@ -520,31 +528,8 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
       throw new Error("SDXL não retornou resultado");
     }
 
-    let imagemTransformada = resultado[0];
-
-    // ETAPA 2: Melhorar/restaurar o rosto com CodeFormer
-    console.log("Aplicando melhoria facial com CodeFormer...");
-    
-    const resultadoFace = await queue.add(async () => {
-      const output = await replicate.run(
-        "sczhou/codeformer:7de2ea26c616d5bf2245ad0d5e24f0ff9a6204578a5c876db53142edd9d2cd41",
-        {
-          input: {
-            image: imagemTransformada,
-            codeformer_fidelity: 0.7,
-            background_enhance: true,
-            face_upsample: true,
-            upscale: 2
-          }
-        }
-      );
-      
-      console.log("CodeFormer output:", output);
-      return output;
-    });
-
-    let finalImageUrl = resultadoFace || imagemTransformada;
-    console.log("URL final:", finalImageUrl);
+    let finalImageUrl = resultado[0];
+    console.log("Final URL:", finalImageUrl);
 
     await Geracao.create({
       usuario: req.userId,
@@ -554,6 +539,8 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
       custo: 1
     });
 
+    console.log("=== TRANSFORM SUCCESS ===");
+    
     res.json({
       success: true,
       imageUrl: finalImageUrl,
@@ -561,7 +548,8 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Erro no transform:", err);
+    console.error("=== TRANSFORM ERROR ===");
+    console.error(err);
     if (tempFile) {
       await fs.promises.unlink(tempFile).catch(() => {});
     }
