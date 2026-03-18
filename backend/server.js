@@ -17,25 +17,34 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// CORS
+// ================= CORS =================
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
-app.options("*", cors());
 
-// Cloudinary
+// ✅ CORREÇÃO AQUI (NÃO USA MAIS "*")
+app.options("/*", cors());
+
+// ================= CLOUDINARY =================
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// DB
-mongoose.connect(process.env.MONGO_URI);
+// ================= DB =================
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log("🟢 MongoDB conectado");
+}).catch(err => {
+  console.error("🔴 Erro MongoDB:", err);
+});
 
-// SCHEMAS
+// ================= SCHEMAS =================
 const Usuario = mongoose.model("Usuario", new mongoose.Schema({
   nome: String,
   email: { type: String, unique: true },
@@ -56,23 +65,30 @@ const Geracao = mongoose.model("Geracao", new mongoose.Schema({
   data: { type: Date, default: Date.now }
 }));
 
+// ================= REPLICATE =================
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN
 });
 
+// ================= FILA =================
 const queue = new PQueue({ concurrency: 1 });
 
+// ================= UPLOAD =================
 const upload = multer({
   dest: os.tmpdir(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// AUTH
+// ================= AUTH =================
 function auth(req, res, next) {
   const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: "Token ausente" });
+
+  if (!header) {
+    return res.status(401).json({ error: "Token ausente" });
+  }
 
   const token = header.split(" ")[1];
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.id;
@@ -82,7 +98,7 @@ function auth(req, res, next) {
   }
 }
 
-// 🔥 converter stream → buffer
+// ================= STREAM → BUFFER =================
 async function streamToBuffer(stream) {
   const reader = stream.getReader();
   const chunks = [];
@@ -97,7 +113,6 @@ async function streamToBuffer(stream) {
 }
 
 // ================= TRANSFORM =================
-
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   console.log("=== TRANSFORM STARTED ===");
 
@@ -130,7 +145,7 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     await fs.promises.unlink(tempFile);
     tempFile = null;
 
-    console.log("Rodando IP-Adapter (FACE LOCK)...");
+    console.log("Rodando IA (FACE LOCK)...");
 
     const resultado = await queue.add(async () => {
       return await replicate.run(
@@ -138,18 +153,11 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
         {
           input: {
             image: cloudResult.secure_url,
-
-            // 🔥 PROMPT OTIMIZADO PRA ROSTO
             prompt: `${prompt}, ultra realistic, 4k, detailed skin, sharp face, professional photography`,
-
-            // 🔥 SEGREDO DO ROSTO
             face_image: cloudResult.secure_url,
-
-            ip_adapter_scale: 0.8, // 🔥 controle de fidelidade
-
+            ip_adapter_scale: 0.8,
             num_inference_steps: 40,
             guidance_scale: 7.5,
-
             negative_prompt: "blurry, deformed face, ugly, distorted, low quality"
           }
         }
@@ -203,7 +211,6 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
 });
 
 // ================= ROOT =================
-
 app.get("/", (req, res) => {
   res.json({
     status: "API ONLINE",
@@ -212,7 +219,6 @@ app.get("/", (req, res) => {
 });
 
 // ================= SERVER =================
-
 const PORT = process.env.PORT || 8000;
 
 const server = http.createServer(app);
