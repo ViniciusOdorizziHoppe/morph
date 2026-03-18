@@ -7,6 +7,8 @@ const Replicate = require("replicate");
 const PQueue = require("p-queue").default;
 const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 app.use(express.json());
@@ -31,6 +33,31 @@ const replicate = new Replicate({
 });
 
 mongoose.connect(process.env.MONGO_URI);
+
+/* ================= AUTH MIDDLEWARE ================= */
+
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token não fornecido" });
+  }
+  
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return res.status(401).json({ error: "Token mal formatado" });
+  }
+  
+  const token = parts[1];
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "morph_secret_key");
+    req.userId = decoded.id;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: "Token inválido" });
+  }
+};
 
 /* ================= MODELS ================= */
 
@@ -190,8 +217,95 @@ async function processImage(jobId) {
 
 /* ================= ROTAS ================= */
 
+// 🔥 AUTH - LOGIN
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, senha } = req.body;
+    
+    if (!email || !senha) {
+      return res.status(400).json({ error: "Email e senha são obrigatórios" });
+    }
+    
+    const user = await Usuario.findOne({ email });
+    
+    if (!user) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+    
+    const isMatch = await bcrypt.compare(senha, user.senha);
+    
+    if (!isMatch) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+    
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "morph_secret_key",
+      { expiresIn: "7d" }
+    );
+    
+    res.json({
+      token,
+      usuario: {
+        id: user._id,
+        nome: user.email.split("@")[0],
+        email: user.email,
+        plano: user.plano,
+        creditos: user.creditos
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔥 AUTH - CADASTRO
+app.post("/api/auth/cadastro", async (req, res) => {
+  try {
+    const { nome, email, senha } = req.body;
+    
+    if (!email || !senha) {
+      return res.status(400).json({ error: "Email e senha são obrigatórios" });
+    }
+    
+    const existingUser = await Usuario.findOne({ email });
+    
+    if (existingUser) {
+      return res.status(400).json({ error: "Email já cadastrado" });
+    }
+    
+    const hashedSenha = await bcrypt.hash(senha, 10);
+    
+    const user = await Usuario.create({
+      email,
+      senha: hashedSenha,
+      plano: "free",
+      creditos: 5
+    });
+    
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "morph_secret_key",
+      { expiresIn: "7d" }
+    );
+    
+    res.json({
+      token,
+      usuario: {
+        id: user._id,
+        nome: nome || email.split("@")[0],
+        email: user.email,
+        plano: user.plano,
+        creditos: user.creditos
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 🔥 TRANSFORM
-app.post("/api/transform", upload.single("image"), async (req, res) => {
+app.post("/api/transform", authMiddleware, upload.single("image"), async (req, res) => {
   try {
     const user = await Usuario.findById(req.userId);
 
@@ -247,7 +361,7 @@ app.get("/api/status/:id", async (req, res) => {
 });
 
 // 🔥 HISTÓRICO
-app.get("/api/historico", async (req, res) => {
+app.get("/api/historico", authMiddleware, async (req, res) => {
   try {
     const historico = await Geracao.find({ usuario: req.userId })
       .sort({ createdAt: -1 })
