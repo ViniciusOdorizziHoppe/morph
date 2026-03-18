@@ -2,7 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const fs = require("fs");
 const Replicate = require("replicate");
 const PQueue = require("p-queue").default;
 const cloudinary = require("cloudinary").v2;
@@ -95,7 +94,16 @@ async function antiSpam(user) {
 
 /* ================= UPLOAD ================= */
 
-const upload = multer({ dest: "uploads/" });
+// memoryStorage: arquivo fica em req.file.buffer (sem escrever no disco)
+// necessário em containers como Koyeb onde não há diretório uploads/ persistente
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Apenas imagens são permitidas."));
+  }
+});
 
 /* ================= CORE PROCESS ================= */
 
@@ -221,8 +229,14 @@ app.post("/api/transform", authMiddleware, upload.single("image"), async (req, r
 
     if (!req.file) return res.status(400).json({ error: "Sem imagem" });
 
-    const uploadResult = await cloudinary.uploader.upload(req.file.path);
-    await fs.promises.unlink(req.file.path).catch(() => {});
+    // upload direto do buffer para o Cloudinary (sem arquivo em disco)
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "morph/uploads", resource_type: "image" },
+        (err, result) => err ? reject(err) : resolve(result)
+      );
+      stream.end(req.file.buffer);
+    });
 
     const job = await Geracao.create({
       usuario: user._id,
