@@ -10,22 +10,19 @@ import Replicate from "replicate";
 import PQueue from "p-queue";
 import cors from "cors";
 import { v2 as cloudinary } from "cloudinary";
-import http from "http";
 
 dotenv.config();
 
 const app = express();
+
 app.use(express.json());
 
-// ================= CORS =================
+// ================= CORS CORRIGIDO =================
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
-// ✅ CORREÇÃO AQUI (NÃO USA MAIS "*")
-app.options("/*", cors());
 
 // ================= CLOUDINARY =================
 cloudinary.config({
@@ -35,33 +32,35 @@ cloudinary.config({
 });
 
 // ================= DB =================
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log("🟢 MongoDB conectado");
-}).catch(err => {
-  console.error("🔴 Erro MongoDB:", err);
-});
+mongoose.connect(process.env.MONGO_URI);
 
 // ================= SCHEMAS =================
 const Usuario = mongoose.model("Usuario", new mongoose.Schema({
-  nome: String,
-  email: { type: String, unique: true },
-  senha: String,
+  nome: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  senha: { type: String, required: true },
   creditos: { type: Number, default: 5 },
   createdAt: { type: Date, default: Date.now },
   lastActive: { type: Date, default: Date.now },
-  referralCode: String,
-  referredBy: mongoose.Schema.Types.ObjectId,
+  referralCode: { type: String, unique: true, sparse: true },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
   isAdmin: { type: Boolean, default: false }
 }));
 
 const Geracao = mongoose.model("Geracao", new mongoose.Schema({
-  usuario: mongoose.Schema.Types.ObjectId,
+  usuario: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
   imagem: String,
   resultado: String,
   prompt: String,
+  data: { type: Date, default: Date.now }
+}));
+
+const Transacao = mongoose.model("Transacao", new mongoose.Schema({
+  usuario: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
+  tipo: { type: String, enum: ['compra', 'uso', 'bonus', 'referral'] },
+  quantidade: Number,
+  valor: { type: Number, default: 0 },
+  status: { type: String, enum: ['pendente', 'aprovado', 'recusado'], default: 'aprovado' },
   data: { type: Date, default: Date.now }
 }));
 
@@ -82,104 +81,318 @@ const upload = multer({
 // ================= AUTH =================
 function auth(req, res, next) {
   const header = req.headers.authorization;
-
-  if (!header) {
-    return res.status(401).json({ error: "Token ausente" });
-  }
-
+  if (!header) return res.status(401).json({ success: false, error: "Token ausente" });
+  
   const token = header.split(" ")[1];
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.id;
     next();
   } catch {
-    return res.status(401).json({ error: "Token inválido" });
+    return res.status(401).json({ success: false, error: "Token inválido" });
   }
 }
 
-// ================= STREAM → BUFFER =================
-async function streamToBuffer(stream) {
-  const reader = stream.getReader();
-  const chunks = [];
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
+async function adminOnly(req, res, next) {
+  try {
+    const user = await Usuario.findById(req.userId);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ success: false, error: "Acesso negado" });
+    }
+    next();
+  } catch (err) {
+    return res.status(500).json({ success: false, error: "Erro ao verificar admin" });
   }
+}
 
+// ================= STREAM TO BUFFER =================
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks);
 }
 
-// ================= TRANSFORM =================
+// ================= AUTH ROUTES =================
+app.post("/api/auth/cadastro", async (req, res) => {
+  try {
+    const { nome, email, senha, referralCode } = req.body;
+    
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ success: false, error: "Preencha todos os campos" });
+    }
+    
+    if (senha.length < 6) {
+      return res.status(400).json({ success: false, error: "Senha deve ter no mínimo 6 caracteres" });
+    }
+    
+    const existe = await Usuario.findOne({ email });
+    if (existe) {
+      return res.status(400).json({ success: false, error: "Email já cadastrado" });
+    }
+    
+    const userReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    let bonusCredits = 5;
+    let referredBy = null;
+    
+    if (referralCode) {
+      const referrer = await Usuario.findOne({ referralCode: referralCode.toUpperCase() });
+      if (referrer) {
+        referredBy = referrer._id;
+        bonusCredits = 10;
+        await Usuario.findByIdAndUpdate(referrer._id, { $inc: { creditos: 5 } });
+        await Transacao.create({
+          usuario: referrer._id,
+          tipo: 'referral',
+          quantidade: 5,
+          status: 'aprovado'
+        });
+      }
+    }
+    
+    const hash = await bcrypt.hash(senha, 10);
+    const user = await Usuario.create({ 
+      nome, 
+      email, 
+      senha: hash, 
+      creditos: bonusCredits,
+      referralCode: userReferralCode,
+      referredBy,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    await Transacao.create({
+      usuario: user._id,
+      tipo: 'bonus',
+      quantidade: bonusCredits,
+      status: 'aprovado'
+    });
+    
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    
+    res.json({
+      success: true,
+      token,
+      usuario: {
+        id: user._id,
+        nome: user.nome,
+        email: user.email,
+        creditos: user.creditos,
+        referralCode: user.referralCode
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Erro ao criar conta" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, senha } = req.body;
+    
+    if (!email || !senha) {
+      return res.status(400).json({ success: false, error: "Preencha email e senha" });
+    }
+    
+    const user = await Usuario.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ success: false, error: "Usuário não encontrado" });
+    }
+    
+    const ok = await bcrypt.compare(senha, user.senha);
+    if (!ok) {
+      return res.status(401).json({ success: false, error: "Senha incorreta" });
+    }
+    
+    await Usuario.findByIdAndUpdate(user._id, { lastActive: new Date() });
+    
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    
+    res.json({
+      success: true,
+      token,
+      usuario: {
+        id: user._id,
+        nome: user.nome,
+        email: user.email,
+        creditos: user.creditos,
+        referralCode: user.referralCode,
+        isAdmin: user.isAdmin
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Erro ao fazer login" });
+  }
+});
+
+// ================= ADD 100 CREDITS =================
+app.post("/api/add-100-credits", auth, async (req, res) => {
+  try {
+    const user = await Usuario.findByIdAndUpdate(
+      req.userId,
+      { $inc: { creditos: 100 } },
+      { new: true }
+    );
+    
+    await Transacao.create({
+      usuario: user._id,
+      tipo: 'bonus',
+      quantidade: 100,
+      status: 'aprovado'
+    });
+    
+    res.json({ success: true, message: "100 créditos adicionados!", creditos: user.creditos });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ================= ADMIN ROUTES =================
+app.get("/api/admin/dashboard", auth, adminOnly, async (req, res) => {
+  try {
+    const agora = new Date();
+    const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const cincoMinutosAtras = new Date(agora - 5 * 60 * 1000);
+    
+    const [
+      totalUsuarios,
+      usuariosHoje,
+      usuariosMes,
+      usuariosAtivos,
+      totalGeracoes,
+      geracoesHoje
+    ] = await Promise.all([
+      Usuario.countDocuments(),
+      Usuario.countDocuments({ createdAt: { $gte: inicioDoDia } }),
+      Usuario.countDocuments({ createdAt: { $gte: inicioDoMes } }),
+      Usuario.countDocuments({ lastActive: { $gte: cincoMinutosAtras } }),
+      Geracao.countDocuments(),
+      Geracao.countDocuments({ data: { $gte: inicioDoDia } })
+    ]);
+    
+    const topUsuarios = await Geracao.aggregate([
+      { $group: { _id: "$usuario", totalGeracoes: { $sum: 1 } } },
+      { $sort: { totalGeracoes: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: "usuarios", localField: "_id", foreignField: "_id", as: "usuario" } },
+      { $unwind: "$usuario" },
+      { $project: { nome: "$usuario.nome", email: "$usuario.email", totalGeracoes: 1 } }
+    ]);
+    
+    res.json({
+      success: true,
+      estatisticas: {
+        usuarios: { total: totalUsuarios, hoje: usuariosHoje, esteMes: usuariosMes, ativosAgora: usuariosAtivos },
+        geracoes: { total: totalGeracoes, hoje: geracoesHoje },
+        topUsuarios
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ================= TRANSFORM IMAGE =================
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   console.log("=== TRANSFORM STARTED ===");
-
+  
   let tempFile = req.file?.path;
-
+  
   try {
     const user = await Usuario.findOneAndUpdate(
       { _id: req.userId, creditos: { $gte: 1 } },
       { $inc: { creditos: -1 }, lastActive: new Date() },
-      { returnDocument: "after" }
+      { new: true }
     );
 
     if (!user) {
       if (tempFile) await fs.promises.unlink(tempFile).catch(() => {});
-      return res.status(402).json({ error: "Créditos insuficientes" });
+      return res.status(402).json({ success: false, error: "Créditos insuficientes" });
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: "Nenhuma imagem enviada" });
+      return res.status(400).json({ success: false, error: "Nenhuma imagem enviada" });
     }
 
     const prompt = req.body.prompt?.trim() || "a person";
+    const strength = Math.min(Math.max(parseFloat(req.body.strength) || 0.75, 0.1), 1.0);
 
-    console.log("Upload Cloudinary...");
-
+    console.log("Uploading to Cloudinary...");
+    
     const cloudResult = await cloudinary.uploader.upload(tempFile, {
-      folder: "morph_uploads"
+      folder: "morph_uploads",
+      resource_type: "image"
     });
 
-    await fs.promises.unlink(tempFile);
+    console.log("Upload done:", cloudResult.secure_url);
+
+    await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    console.log("Rodando IA (FACE LOCK)...");
-
+    console.log("Processing with SDXL img2img...");
+    
     const resultado = await queue.add(async () => {
-      return await replicate.run(
-        "lucataco/ip-adapter-face-id",
+      const output = await replicate.run(
+        "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
         {
           input: {
             image: cloudResult.secure_url,
-            prompt: `${prompt}, ultra realistic, 4k, detailed skin, sharp face, professional photography`,
-            face_image: cloudResult.secure_url,
-            ip_adapter_scale: 0.8,
-            num_inference_steps: 40,
+            prompt: `${prompt}, same face, preserve identity, photorealistic, high quality`,
+            negative_prompt: "different face, changed identity, distorted face, blurry, low quality, ugly, deformed",
+            strength: strength,
+            num_outputs: 1,
+            num_inference_steps: 50,
             guidance_scale: 7.5,
-            negative_prompt: "blurry, deformed face, ugly, distorted, low quality"
+            scheduler: "K_EULER"
           }
         }
       );
+      
+      console.log("Raw output:", output);
+      return output;
     });
 
-    if (!resultado || !resultado[0]) {
-      throw new Error("Modelo não retornou imagem");
+    if (!resultado || resultado.length === 0) {
+      throw new Error("Modelo não retornou resultado");
     }
 
-    console.log("Convertendo stream...");
+    // Verifica se é URL ou Stream
+    let finalImageUrl;
+    
+    if (typeof resultado[0] === 'string') {
+      finalImageUrl = resultado[0];
+      console.log("Result is URL:", finalImageUrl);
+    } else {
+      // É um stream - converte para buffer e faz upload
+      console.log("Result is stream, converting...");
+      const stream = resultado[0];
+      const buffer = await streamToBuffer(stream);
+      
+      console.log("Uploading result to Cloudinary...");
+      const uploadResult = await new Promise((resolve, reject) => {
+        const { Readable } = require('stream');
+        const readableStream = Readable.from([buffer]);
+        
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: "morph_results", resource_type: "image" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        
+        readableStream.pipe(uploadStream);
+      });
+      
+      finalImageUrl = uploadResult.secure_url;
+    }
 
-    const buffer = await streamToBuffer(resultado[0]);
-
-    console.log("Upload resultado...");
-
-    const uploadFinal = await cloudinary.uploader.upload(
-      `data:image/png;base64,${buffer.toString("base64")}`,
-      { folder: "morph_results" }
-    );
-
-    const finalImageUrl = uploadFinal.secure_url;
+    console.log("Final URL:", finalImageUrl);
 
     await Geracao.create({
       usuario: req.userId,
@@ -197,33 +410,38 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("ERRO:", err);
-
-    if (tempFile) {
-      await fs.promises.unlink(tempFile).catch(() => {});
-    }
-
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error("=== ERROR ===", err);
+    if (tempFile) await fs.promises.unlink(tempFile).catch(() => {});
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ================= ROOT =================
+app.get("/api/historico", auth, async (req, res) => {
+  try {
+    const dados = await Geracao.find({ usuario: req.userId })
+      .sort({ data: -1 })
+      .limit(20);
+    
+    res.json(dados.map(g => ({ 
+      id: g._id,
+      imagemOutput: g.resultado, 
+      imagemInput: g.imagem,
+      prompt: g.prompt, 
+      data: g.data 
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao carregar histórico" });
+  }
+});
+
 app.get("/", (req, res) => {
-  res.json({
-    status: "API ONLINE",
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: "API ONLINE", timestamp: new Date().toISOString() });
 });
 
-// ================= SERVER =================
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ success: false, error: "Erro interno do servidor" });
+});
+
 const PORT = process.env.PORT || 8000;
-
-const server = http.createServer(app);
-server.timeout = 300000;
-
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server rodando na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server rodando na porta ${PORT}`));
