@@ -10,6 +10,7 @@ import Replicate from "replicate";
 import PQueue from "p-queue";
 import cors from "cors";
 import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
 
 dotenv.config();
 
@@ -298,6 +299,7 @@ app.get("/api/admin/dashboard", auth, adminOnly, async (req, res) => {
 });
 
 // ================= TRANSFORM IMAGE =================
+// ================= TRANSFORM IMAGE =================
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   console.log("=== TRANSFORM STARTED ===");
   
@@ -374,20 +376,12 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
       const buffer = await streamToBuffer(stream);
       
       console.log("Uploading result to Cloudinary...");
-      const uploadResult = await new Promise((resolve, reject) => {
-        const { Readable } = require('stream');
-        const readableStream = Readable.from([buffer]);
-        
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: "morph_results", resource_type: "image" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        
-        readableStream.pipe(uploadStream);
-      });
+      
+      // ✅ MÉTODO CORRIGIDO - Upload base64
+      const uploadResult = await cloudinary.uploader.upload(
+        `data:image/png;base64,${buffer.toString("base64")}`,
+        { folder: "morph_results" }
+      );
       
       finalImageUrl = uploadResult.secure_url;
     }
@@ -414,33 +408,6 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     if (tempFile) await fs.promises.unlink(tempFile).catch(() => {});
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-app.get("/api/historico", auth, async (req, res) => {
-  try {
-    const dados = await Geracao.find({ usuario: req.userId })
-      .sort({ data: -1 })
-      .limit(20);
-    
-    res.json(dados.map(g => ({ 
-      id: g._id,
-      imagemOutput: g.resultado, 
-      imagemInput: g.imagem,
-      prompt: g.prompt, 
-      data: g.data 
-    })));
-  } catch (err) {
-    res.status(500).json({ error: "Erro ao carregar histórico" });
-  }
-});
-
-app.get("/", (req, res) => {
-  res.json({ status: "API ONLINE", timestamp: new Date().toISOString() });
-});
-
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, error: "Erro interno do servidor" });
 });
 
 const PORT = process.env.PORT || 8000;
