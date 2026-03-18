@@ -181,6 +181,38 @@ async function processImage(jobId) {
 
 /* ================= ROTAS ================= */
 
+// DEBUG — testa MongoDB, Cloudinary e variáveis de ambiente
+app.get("/api/debug", async (req, res) => {
+  const resultado = {
+    env: {
+      MONGO_URI:          !!process.env.MONGO_URI,
+      CLOUDINARY_NAME:    !!process.env.CLOUDINARY_NAME,
+      CLOUDINARY_KEY:     !!process.env.CLOUDINARY_KEY,
+      CLOUDINARY_SECRET:  !!process.env.CLOUDINARY_SECRET,
+      REPLICATE_API_TOKEN: !!process.env.REPLICATE_API_TOKEN,
+      JWT_SECRET:         !!process.env.JWT_SECRET,
+    },
+    mongodb: "não testado",
+    cloudinary: "não testado"
+  };
+
+  try {
+    await mongoose.connection.db.admin().ping();
+    resultado.mongodb = "✅ conectado";
+  } catch (err) {
+    resultado.mongodb = `❌ ${err.message}`;
+  }
+
+  try {
+    await cloudinary.api.ping();
+    resultado.cloudinary = "✅ conectado";
+  } catch (err) {
+    resultado.cloudinary = `❌ ${err.message}`;
+  }
+
+  res.json(resultado);
+});
+
 // AUTH - LOGIN
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -230,20 +262,30 @@ app.post("/api/transform", authMiddleware, upload.single("image"), async (req, r
     if (!req.file) return res.status(400).json({ error: "Sem imagem" });
 
     // upload direto do buffer para o Cloudinary (sem arquivo em disco)
-    const uploadResult = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: "morph/uploads", resource_type: "image" },
-        (err, result) => err ? reject(err) : resolve(result)
-      );
-      stream.end(req.file.buffer);
-    });
+    let uploadResult;
+    try {
+      uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "morph/uploads", resource_type: "image" },
+          (err, result) => err ? reject(err) : resolve(result)
+        );
+        stream.end(req.file.buffer);
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `Cloudinary upload falhou: ${err.message}` });
+    }
 
-    const job = await Geracao.create({
-      usuario: user._id,
-      imagem: uploadResult.secure_url,
-      prompt: req.body.prompt || "a person",
-      status: "pending"
-    });
+    let job;
+    try {
+      job = await Geracao.create({
+        usuario: user._id,
+        imagem: uploadResult.secure_url,
+        prompt: req.body.prompt || "a person",
+        status: "pending"
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `MongoDB create falhou: ${err.message}` });
+    }
 
     processImage(job._id);
 
