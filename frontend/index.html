@@ -1079,19 +1079,38 @@ document.addEventListener('keydown', (e) => {
     <h2>Comprar créditos</h2>
     <p>Cada crédito = 1 transformação. Nunca expiram.</p>
     <div class="plans">
-      <div class="plan selected" onclick="selectPlan(this,10,'R$ 9,90')">
-        <div><div class="plan-name">⚡ Starter</div><div class="plan-desc">10 créditos — R$ 0,99/cada</div></div>
-        <div class="plan-price">R$ 9,90</div>
-      </div>
-      <div class="plan" onclick="selectPlan(this,50,'R$ 34,90')">
-        <div><div class="plan-name">🚀 Popular</div><div class="plan-desc">50 créditos — R$ 0,69/cada · -30%</div></div>
-        <div class="plan-price">R$ 34,90</div>
-      </div>
-      <div class="plan" onclick="selectPlan(this,150,'R$ 79,90')">
-        <div><div class="plan-name">💎 Pro</div><div class="plan-desc">150 créditos — R$ 0,53/cada · -46%</div></div>
-        <div class="plan-price">R$ 79,90</div>
-      </div>
+  <div class="plan selected" onclick="selectPlan(this, 5, 4.90)">
+    <div>
+      <div class="plan-name">⚡ Starter</div>
+      <div class="plan-desc">5 créditos · R$ 0,98/cada</div>
     </div>
+    <div class="plan-price">R$ 4,90</div>
+  </div>
+  
+  <div class="plan" onclick="selectPlan(this, 12, 10.90)">
+    <div>
+      <div class="plan-name">🚀 Básico</div>
+      <div class="plan-desc">12 créditos · R$ 0,91/cada · Economize 7%</div>
+    </div>
+    <div class="plan-price">R$ 10,90</div>
+  </div>
+  
+  <div class="plan" onclick="selectPlan(this, 30, 24.90)">
+    <div>
+      <div class="plan-name">💎 Pro</div>
+      <div class="plan-desc">30 créditos · R$ 0,83/cada · Economize 15%</div>
+    </div>
+    <div class="plan-price">R$ 24,90</div>
+  </div>
+  
+  <div class="plan" onclick="selectPlan(this, 80, 59.90)">
+    <div>
+      <div class="plan-name">👑 Business</div>
+      <div class="plan-desc">80 créditos · R$ 0,75/cada · Economize 24%</div>
+    </div>
+    <div class="plan-price">R$ 59,90</div>
+  </div>
+</div>
     <button class="btn-checkout" onclick="checkout()">Pagar agora →</button>
     <button class="btn-close-modal" onclick="closeModal()">Cancelar</button>
   </div>

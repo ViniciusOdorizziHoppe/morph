@@ -309,6 +309,10 @@ app.get("/api/admin/dashboard", auth, adminOnly, async (req, res) => {
     const visitantesTotais = await Visitante.countDocuments();
     const taxaConversao = visitantesTotais > 0 ? ((totalUsuarios / visitantesTotais) * 100).toFixed(2) : 0;
     
+    // Custo e lucro (R$ 0,55 por geração)
+    const custoTotal = totalGeracoes * 0.55;
+    const lucroTotal = (receitaTotal[0]?.total || 0) - custoTotal;
+    
     res.json({
       success: true,
       estatisticas: {
@@ -327,7 +331,9 @@ app.get("/api/admin/dashboard", auth, adminOnly, async (req, res) => {
           receitaTotal: receitaTotal[0]?.total || 0,
           receitaHoje: receitaHoje[0]?.total || 0,
           receitaMes: receitaMes[0]?.total || 0,
-          totalTransacoes
+          custoTotal: custoTotal.toFixed(2),
+          lucroTotal: lucroTotal.toFixed(2),
+          margem: receitaTotal[0]?.total > 0 ? ((lucroTotal / receitaTotal[0]?.total) * 100).toFixed(1) : 0
         },
         conversao: {
           visitantes: visitantesTotais,
@@ -379,7 +385,7 @@ app.get("/api/admin/usuarios", auth, adminOnly, async (req, res) => {
 
 app.post("/api/admin/usuarios/:id/creditos", auth, adminOnly, async (req, res) => {
   try {
-    const { quantidade, motivo = 'Ajuste manual' } = req.body;
+    const { quantidade } = req.body;
     
     const user = await Usuario.findByIdAndUpdate(
       req.params.id,
@@ -447,7 +453,7 @@ app.post("/api/track/visit", async (req, res) => {
   }
 });
 
-// ============== TRANSFORM IMAGE - FLUX DEV (FUNCIONANDO) ==============
+// ============== TRANSFORM IMAGE - PRESERVAÇÃO FACIAL ==============
 
 app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
   let tempFile = req.file?.path;
@@ -486,35 +492,58 @@ app.post("/api/transform", auth, upload.single("image"), async (req, res) => {
     await fs.promises.unlink(tempFile).catch(() => {});
     tempFile = null;
 
-    console.log("Enviando para Flux Dev...");
-    
+    console.log("Processando com SDXL + preservação facial...");
+
+    // ETAPA 1: Usar SDXL img2img para transformação base
     const resultado = await queue.add(async () => {
-      // FLUX DEV - Modelo mais estável da Replicate
       const output = await replicate.run(
-        "black-forest-labs/flux-dev",
+        "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
         {
           input: {
-            prompt: `${prompt}, maintaining the face structure and identity of the person in the reference image`,
             image: cloudResult.secure_url,
+            prompt: `${prompt}, same face, preserve identity, photorealistic, high quality`,
+            negative_prompt: "different face, changed identity, distorted face, blurry, low quality, ugly, deformed",
             strength: strength,
             num_outputs: 1,
-            aspect_ratio: "1:1",
-            output_format: "png",
-            guidance_scale: 3.5,
-            num_inference_steps: 28
+            num_inference_steps: 50,
+            guidance_scale: 7.5,
+            scheduler: "K_EULER"
           }
         }
       );
       
-      console.log("Flux output:", output);
+      console.log("SDXL output:", output);
       return output;
     });
 
     if (!resultado || resultado.length === 0) {
-      throw new Error("Flux não retornou resultado");
+      throw new Error("SDXL não retornou resultado");
     }
 
-    let finalImageUrl = resultado[0];
+    let imagemTransformada = resultado[0];
+
+    // ETAPA 2: Melhorar/restaurar o rosto com CodeFormer
+    console.log("Aplicando melhoria facial com CodeFormer...");
+    
+    const resultadoFace = await queue.add(async () => {
+      const output = await replicate.run(
+        "sczhou/codeformer:7de2ea26c616d5bf2245ad0d5e24f0ff9a6204578a5c876db53142edd9d2cd41",
+        {
+          input: {
+            image: imagemTransformada,
+            codeformer_fidelity: 0.7,
+            background_enhance: true,
+            face_upsample: true,
+            upscale: 2
+          }
+        }
+      );
+      
+      console.log("CodeFormer output:", output);
+      return output;
+    });
+
+    let finalImageUrl = resultadoFace || imagemTransformada;
     console.log("URL final:", finalImageUrl);
 
     await Geracao.create({
