@@ -6,9 +6,17 @@ const fs = require("fs");
 const Replicate = require("replicate");
 const PQueue = require("p-queue").default;
 const cloudinary = require("cloudinary").v2;
+const cors = require("cors");
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+  origin: [
+    "https://morph-one-tan.vercel.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 /* ================= CONFIG ================= */
 
