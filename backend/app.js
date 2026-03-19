@@ -9,28 +9,42 @@ const creditRoutes = require('./routes/creditRoutes');
 
 const app = express();
 
-// ✅ CORREÇÃO: Trust proxy para Koyeb/Vercel
-app.set('trust proxy', 1);
+// ✅ CORREÇÃO CORS - Permitir múltiplas origens
+const allowedOrigins = [
+    'https://morph-one-tan.vercel.app',
+    'https://morph.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
+];
 
-// CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+    origin: function (origin, callback) {
+        // Permitir requisições sem origin (mobile apps, curl, etc)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+            callback(null, true);
+        } else {
+            console.log('CORS bloqueado para:', origin);
+            callback(null, true); // Temporariamente permitir todas durante desenvolvimento
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Rate limiting (agora funciona corretamente)
+// Trust proxy para Koyeb/Vercel
+app.set('trust proxy', 1);
+
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Muitas requisições' }
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { success: false, message: 'Muitas requisições' }
 });
 app.use('/api/', limiter);
-
-const generationLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 5
-});
-app.use('/api/images/generate', generationLimiter);
 
 // Body parsing
 app.use(compression());
@@ -39,25 +53,28 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes NOVAS
+// Routes
 app.use('/api/images', imageRoutes);
 app.use('/api/credits', creditRoutes);
 
-// ✅ ROTA LEGACY: Redirecionar rotas antigas para novas (temporário)
+// ✅ ADICIONAR: Rotas de autenticação (temporário até criar controller)
+app.use('/api/auth', require('./routes/authRoutes'));
+
+// Rota legacy
 app.post('/api/transform', (req, res) => {
-  res.redirect(307, '/api/images/generate');
+    res.redirect(307, '/api/images/generate');
 });
 
 app.get('/api/historico', (req, res) => {
-  res.redirect(307, '/api/images/generations');
+    res.redirect(307, '/api/images/generations');
 });
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Rota não encontrada' });
+    res.status(404).json({ success: false, message: 'Rota não encontrada' });
 });
 
 // Error handler
