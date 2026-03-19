@@ -1,4 +1,4 @@
-const { body, param, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 
 const validateGenerationRequest = [
   body('prompt')
@@ -14,12 +14,7 @@ const validateGenerationRequest = [
   body('style')
     .optional()
     .isIn(['professional', 'artistic', 'realistic', 'cinematic', 'anime'])
-    .withMessage('Estilo inválido'),
-  
-  body('aspectRatio')
-    .optional()
-    .isIn(['1:1', '16:9', '9:16', '4:3', '3:4'])
-    .withMessage('Proporção inválida')
+    .withMessage('Estilo inválido')
 ];
 
 const handleValidationErrors = (req, res, next) => {
@@ -36,7 +31,4 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-module.exports = {
-  validateGenerationRequest,
-  handleValidationErrors
-};
+module.exports = { validateGenerationRequest, handleValidationErrors };

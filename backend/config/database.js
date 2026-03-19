@@ -7,7 +7,7 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log('MongoDB Connected:', conn.connection.host);
   } catch (error) {
     console.error('Database connection error:', error);
     process.exit(1);

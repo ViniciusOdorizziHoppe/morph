@@ -39,22 +39,4 @@ const auth = async (req, res, next) => {
   }
 };
 
-const optionalAuth = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId).select('-password');
-      if (user && !user.isBanned) {
-        req.user = user;
-      }
-    }
-    
-    next();
-  } catch (error) {
-    next();
-  }
-};
-
-module.exports = { auth, optionalAuth };
+module.exports = { auth };

@@ -8,23 +8,20 @@ const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 3001;
 
-// Conectar ao banco de dados
+// Conectar DB
 connectDB();
 
-// Configurar processador da fila (worker)
+// Configurar worker
 const imageQueue = queueService.getQueue();
-imageQueue.process('generate-image', 2, processImageGenerationJob); // 2 workers concorrentes
+imageQueue.process('generate-image', 2, processImageGenerationJob);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  
-  // Fechar fila graciosamente
+  logger.info('Shutting down gracefully');
   await imageQueue.close();
-  
   process.exit(0);
 });
 
 app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  logger.info('Server running on port ' + PORT);
 });

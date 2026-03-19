@@ -2,7 +2,6 @@ const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-// Configuração de storage temporário
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/temp/');
@@ -13,7 +12,6 @@ const storage = multer.diskStorage({
   }
 });
 
-// Filtro de arquivos
 const fileFilter = (req, file, cb) => {
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -31,12 +29,11 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024,
     files: 1
   }
 });
 
-// Middleware de tratamento de erros do Multer
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
@@ -61,7 +58,4 @@ const handleUploadError = (err, req, res, next) => {
   next();
 };
 
-module.exports = {
-  uploadSingle: upload.single('image'),
-  handleUploadError
-};
+module.exports = { uploadSingle: upload.single('image'), handleUploadError };

@@ -5,11 +5,9 @@ const errorHandler = (err, req, res, next) => {
     message: err.message,
     stack: err.stack,
     path: req.path,
-    method: req.method,
-    user: req.user?._id
+    method: req.method
   });
 
-  // Erros específicos
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
@@ -32,7 +30,6 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Erro padrão
   res.status(err.status || 500).json({
     success: false,
     message: process.env.NODE_ENV === 'production' 

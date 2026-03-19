@@ -2,18 +2,13 @@ const { cloudinary, UPLOAD_PRESETS } = require('../config/cloudinary');
 const logger = require('../utils/logger');
 
 class CloudinaryService {
-  /**
-   * Upload de imagem do usuário
-   */
   async uploadUserImage(filePath, userId) {
     try {
       const result = await cloudinary.uploader.upload(filePath, {
         ...UPLOAD_PRESETS.userUploads,
         folder: `morph_uploads/${userId}`,
-        // Garantir URL permanente e pública
         type: 'upload',
         access_mode: 'public',
-        // Adicionar metadata
         context: {
           userId: userId.toString(),
           uploadedAt: new Date().toISOString()
@@ -23,7 +18,7 @@ class CloudinaryService {
       logger.info(`Image uploaded for user ${userId}: ${result.public_id}`);
 
       return {
-        url: result.secure_url,  // URL HTTPS permanente
+        url: result.secure_url,
         publicId: result.public_id,
         width: result.width,
         height: result.height,
@@ -36,21 +31,12 @@ class CloudinaryService {
     }
   }
 
-  /**
-   * Upload de imagem gerada pela IA
-   */
   async uploadGeneratedImage(imageUrl, userId, generationId) {
     try {
-      // Verificar se a URL é acessível
-      const response = await fetch(imageUrl, { method: 'HEAD' });
-      if (!response.ok) {
-        throw new Error('Generated image URL not accessible');
-      }
-
       const result = await cloudinary.uploader.upload(imageUrl, {
         ...UPLOAD_PRESETS.generatedImages,
         folder: `morph_generated/${userId}`,
-        public_id: `gen_${generationId}`,  // Nome previsível
+        public_id: `gen_${generationId}`,
         overwrite: true,
         context: {
           userId: userId.toString(),
@@ -72,15 +58,9 @@ class CloudinaryService {
     }
   }
 
-  /**
-   * Verificar se URL é válida e acessível
-   */
   async validateImageUrl(url) {
     try {
-      const response = await fetch(url, { 
-        method: 'HEAD',
-        timeout: 5000 
-      });
+      const response = await fetch(url, { method: 'HEAD' });
       
       if (!response.ok) {
         return { valid: false, error: 'URL not accessible' };
@@ -97,9 +77,6 @@ class CloudinaryService {
     }
   }
 
-  /**
-   * Deletar imagem
-   */
   async deleteImage(publicId) {
     try {
       const result = await cloudinary.uploader.destroy(publicId);
@@ -108,24 +85,6 @@ class CloudinaryService {
       logger.error('Cloudinary delete error:', error);
       return false;
     }
-  }
-
-  /**
-   * Gerar URL otimizada para diferentes dispositivos
-   */
-  getOptimizedUrl(publicId, options = {}) {
-    const {
-      width = 1024,
-      quality = 'auto',
-      format = 'auto'
-    } = options;
-
-    return cloudinary.url(publicId, {
-      width,
-      quality,
-      fetch_format: format,
-      crop: 'limit'
-    });
   }
 }
 

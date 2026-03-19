@@ -7,7 +7,6 @@ cloudinary.config({
   secure: true
 });
 
-// Configurações padrão para uploads
 const UPLOAD_PRESETS = {
   userUploads: {
     folder: 'morph_uploads',
@@ -17,10 +16,8 @@ const UPLOAD_PRESETS = {
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     transformation: [
       { width: 1024, height: 1024, crop: 'limit' },
-      { quality: 'auto:good' },
-      { fetch_format: 'auto' }
+      { quality: 'auto:good' }
     ],
-    // Importante: garantir que a URL seja permanente
     overwrite: false,
     unique_filename: true
   },
@@ -36,7 +33,4 @@ const UPLOAD_PRESETS = {
   }
 };
 
-module.exports = {
-  cloudinary,
-  UPLOAD_PRESETS
-};
+module.exports = { cloudinary, UPLOAD_PRESETS };

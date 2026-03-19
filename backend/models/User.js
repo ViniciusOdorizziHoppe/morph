@@ -52,11 +52,8 @@ const userSchema = new mongoose.Schema({
       max: 1.0
     }
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: true });
 
-// Hash password antes de salvar
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
@@ -67,7 +64,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Método para decrementar créditos com segurança
 userSchema.methods.useCredit = async function() {
   if (this.credits < 1) {
     throw new Error('Créditos insuficientes');
