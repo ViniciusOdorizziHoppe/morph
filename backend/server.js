@@ -3,7 +3,6 @@ const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
 const Replicate = require("replicate");
-const PQueue = require("p-queue").default;
 const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -88,8 +87,33 @@ const Geracao = mongoose.model("Geracao", new mongoose.Schema({
 
 /* ================= FILAS ================= */
 
-const queueFree = new PQueue({ concurrency: 1 });
-const queuePremium = new PQueue({ concurrency: 3 });
+// Semáforo simples — substitui p-queue sem dependência ESM
+class Semaphore {
+  constructor(concurrency) {
+    this.concurrency = concurrency;
+    this.running = 0;
+    this.queue = [];
+  }
+
+  add(fn) {
+    return new Promise((resolve, reject) => {
+      const run = async () => {
+        this.running++;
+        try { resolve(await fn()); }
+        catch (err) { reject(err); }
+        finally {
+          this.running--;
+          if (this.queue.length > 0) this.queue.shift()();
+        }
+      };
+      if (this.running < this.concurrency) run();
+      else this.queue.push(run);
+    });
+  }
+}
+
+const queueFree    = new Semaphore(1);
+const queuePremium = new Semaphore(3);
 
 function getQueue(plano) {
   return plano === "premium" ? queuePremium : queueFree;
