@@ -1,126 +1,552 @@
-// Funções globais da aplicação
+// ==========================================
+// MORPH - Frontend Application
+// ==========================================
 
-// ========== AUTENTICAÇÃO ==========
+// Configuração da API
+const API_CONFIG = {
+    BASE_URL: 'https://transformacao.koyeb.app', // Seu backend
+    // BASE_URL: 'http://localhost:3001', // Desenvolvimento
+};
 
-// ========== AUTENTICAÇÃO ==========
+// Cliente HTTP
+class ApiClient {
+    constructor() {
+        this.baseURL = API_CONFIG.BASE_URL;
+        this.token = localStorage.getItem('morph_token');
+    }
 
-async function handleLogin(event) {
-    event.preventDefault();
+    getHeaders() {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+        return headers;
+    }
+
+    async request(endpoint, options = {}) {
+        const url = `${this.baseURL}${endpoint}`;
+        const config = {
+            ...options,
+            headers: {
+                ...this.getHeaders(),
+                ...options.headers,
+            },
+        };
+
+        if (options.body instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
+
+        try {
+            const response = await fetch(url, config);
+            const contentType = response.headers.get('content-type');
+            let data;
+            
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(text || `Erro ${response.status}`);
+            }
+
+            if (!response.ok) {
+                throw new Error(data.message || `Erro ${response.status}`);
+            }
+
+            return data;
+        } catch (error) {
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('Erro de conexão. Verifique se o backend está online.');
+            }
+            throw error;
+        }
+    }
+
+    // Auth
+    async login(email, password) {
+        const data = await this.request('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+        });
+        if (data.token) {
+            this.token = data.token;
+            localStorage.setItem('morph_token', data.token);
+        }
+        return data;
+    }
+
+    async register(name, email, password) {
+        const data = await this.request('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password }),
+        });
+        if (data.token) {
+            this.token = data.token;
+            localStorage.setItem('morph_token', data.token);
+        }
+        return data;
+    }
+
+    async verifyToken() {
+        return this.request('/api/auth/me');
+    }
+
+    logout() {
+        this.token = null;
+        localStorage.removeItem('morph_token');
+    }
+
+    // Credits
+    async getCredits() {
+        return this.request('/api/credits/balance');
+    }
+
+    // Images
+    async generateImage(imageFile, prompt, strength, style, aspectRatio = '1:1') {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('prompt', prompt);
+        formData.append('strength', (strength / 100).toString());
+        formData.append('style', style);
+        formData.append('aspectRatio', aspectRatio);
+
+        return this.request('/api/images/generate', {
+            method: 'POST',
+            body: formData,
+        });
+    }
+
+    async getGenerationStatus(generationId) {
+        return this.request(`/api/images/generations/${generationId}`);
+    }
+
+    async getHistory(page = 1, limit = 20) {
+        return this.request(`/api/images/generations?page=${page}&limit=${limit}`);
+    }
+}
+
+// Instância global
+const api = new ApiClient();
+
+// ==========================================
+// ESTADO E ELEMENTOS
+// ==========================================
+
+const state = {
+    currentImage: null,
+    currentStyle: 'anime',
+    isGenerating: false,
+    pollingInterval: null
+};
+
+// Elementos DOM (inicializados no DOMContentLoaded)
+let elements = {};
+
+// ==========================================
+// FUNÇÕES GLOBAIS (necessárias para HTML)
+// ==========================================
+
+window.showLogin = function() {
+    closeModals();
+    document.getElementById('loginModal').classList.remove('hidden');
+};
+
+window.showRegister = function() {
+    closeModals();
+    document.getElementById('registerModal').classList.remove('hidden');
+};
+
+window.closeModals = function() {
+    document.getElementById('loginModal').classList.add('hidden');
+    document.getElementById('registerModal').classList.add('hidden');
+    document.getElementById('creditsModal').classList.add('hidden');
+};
+
+window.logout = function() {
+    api.logout();
+    showAuthUI();
+    showNotification('Logout realizado', 'info');
+};
+
+window.removeImage = function() {
+    state.currentImage = null;
+    elements.imageInput.value = '';
+    elements.previewImage.src = '';
+    elements.previewImage.classList.add('hidden');
+    elements.uploadPlaceholder.classList.remove('hidden');
+    elements.removeImage.classList.add('hidden');
+    updateGenerateButton();
+};
+
+window.updateStrength = function(value) {
+    elements.strengthValue.textContent = `${value}%`;
+};
+
+window.selectStyle = function(chip) {
+    document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.currentStyle = chip.dataset.style;
+};
+
+window.enhancePrompt = function() {
+    const prompt = elements.promptInput.value;
+    if (!prompt) {
+        showNotification('Digite um prompt primeiro', 'info');
+        return;
+    }
     
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    const btn = event.target.querySelector('button[type="submit"]');
+    const hasEnhancement = ['highly detailed', 'professional quality', '8k'].some(e => 
+        prompt.toLowerCase().includes(e)
+    );
     
-    // Loading state
+    if (!hasEnhancement) {
+        elements.promptInput.value = `${prompt}, highly detailed, professional quality`;
+        updateCharCount();
+        showNotification('Prompt melhorado!', 'success');
+    }
+};
+
+window.generateImage = async function() {
+    if (state.isGenerating) return;
+    
+    const token = localStorage.getItem('morph_token');
+    if (!token) {
+        showLogin();
+        return;
+    }
+    
+    const { currentImage, currentStyle } = state;
+    const prompt = elements.promptInput.value.trim();
+    const strength = parseInt(elements.strengthSlider.value);
+    
+    if (!currentImage || !prompt) return;
+    
+    state.isGenerating = true;
+    updateGenerateButton();
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        showResult(e.target.result, null, 'processing');
+        
+        try {
+            const result = await api.generateImage(currentImage, prompt, strength, currentStyle);
+            showNotification('Geração iniciada!', 'info');
+            updateCredits(result.data.creditsRemaining);
+            startPolling(result.data.generationId);
+        } catch (error) {
+            showNotification(error.message, 'error');
+            state.isGenerating = false;
+            updateGenerateButton();
+            elements.statusBadge.textContent = 'Falhou';
+            elements.statusBadge.classList.add('failed');
+        }
+    };
+    reader.readAsDataURL(currentImage);
+};
+
+window.downloadImage = function() {
+    const img = elements.resultTransformed;
+    if (!img.src) return;
+    
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = `morph-${Date.now()}.png`;
+    link.click();
+    showNotification('Download iniciado', 'success');
+};
+
+window.shareImage = function() {
+    const img = elements.resultTransformed;
+    if (!img.src) return;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Minha criação no MORPH',
+            text: 'Veja o que criei com IA!',
+            url: img.src
+        });
+    } else {
+        navigator.clipboard.writeText(img.src);
+        showNotification('Link copiado!', 'success');
+    }
+};
+
+window.newGeneration = function() {
+    elements.resultSection.classList.add('hidden');
+    removeImage();
+    elements.promptInput.value = '';
+    updateCharCount();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.showBuyCredits = function() {
+    closeModals();
+    document.getElementById('creditsModal').classList.remove('hidden');
+    loadCreditPlans();
+};
+
+window.selectCreditPlan = function(planId, element) {
+    document.querySelectorAll('.credit-plan').forEach(p => p.classList.remove('selected'));
+    element.classList.add('selected');
+    showNotification(`Plano ${planId} selecionado (integração pendente)`, 'info');
+};
+
+window.viewGeneration = async function(id) {
+    try {
+        const result = await api.getGenerationStatus(id);
+        const data = result.data;
+        
+        showResult(data.inputImage, data.outputImage, data.status);
+        elements.promptInput.value = data.prompt;
+        updateCharCount();
+        
+        if (data.settings?.strength) {
+            const percent = Math.round(data.settings.strength * 100);
+            elements.strengthSlider.value = percent;
+            updateStrength(percent);
+        }
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+        showNotification('Erro ao carregar', 'error');
+    }
+};
+
+// ==========================================
+// FUNÇÕES INTERNAS
+// ==========================================
+
+function initElements() {
+    elements = {
+        authSection: document.getElementById('authSection'),
+        userSection: document.getElementById('userSection'),
+        creditsCount: document.getElementById('creditsCount'),
+        loginModal: document.getElementById('loginModal'),
+        registerModal: document.getElementById('registerModal'),
+        creditsModal: document.getElementById('creditsModal'),
+        formLogin: document.getElementById('formLogin'),
+        formRegister: document.getElementById('formRegister'),
+        uploadArea: document.getElementById('uploadArea'),
+        imageInput: document.getElementById('imageInput'),
+        uploadPlaceholder: document.getElementById('uploadPlaceholder'),
+        previewImage: document.getElementById('previewImage'),
+        removeImage: document.getElementById('removeImage'),
+        promptInput: document.getElementById('promptInput'),
+        charCount: document.getElementById('charCount'),
+        strengthSlider: document.getElementById('strengthSlider'),
+        strengthValue: document.getElementById('strengthValue'),
+        generateBtn: document.getElementById('generateBtn'),
+        generateText: document.getElementById('generateText'),
+        resultSection: document.getElementById('resultSection'),
+        resultOriginal: document.getElementById('resultOriginal'),
+        resultTransformed: document.getElementById('resultTransformed'),
+        loadingOverlay: document.getElementById('loadingOverlay'),
+        loadingText: document.getElementById('loadingText'),
+        statusBadge: document.getElementById('statusBadge'),
+        resultActions: document.getElementById('resultActions'),
+        historyGrid: document.getElementById('historyGrid'),
+        styleChips: document.getElementById('styleChips')
+    };
+}
+
+function bindEvents() {
+    // Botões header
+    document.getElementById('btnEntrar').addEventListener('click', showLogin);
+    document.getElementById('btnCriarConta').addEventListener('click', showRegister);
+    
+    // Fechar modais
+    document.getElementById('closeLogin').addEventListener('click', closeModals);
+    document.getElementById('closeRegister').addEventListener('click', closeModals);
+    document.getElementById('closeCredits').addEventListener('click', closeModals);
+    
+    // Links modais
+    document.getElementById('linkCriarConta').addEventListener('click', (e) => {
+        e.preventDefault();
+        showRegister();
+    });
+    document.getElementById('linkEntrar').addEventListener('click', (e) => {
+        e.preventDefault();
+        showLogin();
+    });
+    
+    // Forms
+    elements.formLogin.addEventListener('submit', handleLogin);
+    elements.formRegister.addEventListener('submit', handleRegister);
+    
+    // Upload
+    elements.uploadArea.addEventListener('click', () => elements.imageInput.click());
+    elements.uploadArea.addEventListener('dragover', handleDragOver);
+    elements.uploadArea.addEventListener('dragleave', handleDragLeave);
+    elements.uploadArea.addEventListener('drop', handleDrop);
+    elements.imageInput.addEventListener('change', handleFileSelect);
+    
+    // Controles
+    elements.promptInput.addEventListener('input', updateCharCount);
+    elements.strengthSlider.addEventListener('input', (e) => updateStrength(e.target.value));
+    document.getElementById('btnMelhorarPrompt').addEventListener('click', enhancePrompt);
+    elements.generateBtn.addEventListener('click', generateImage);
+    
+    // Style chips
+    elements.styleChips.querySelectorAll('.style-chip').forEach(chip => {
+        chip.addEventListener('click', () => selectStyle(chip));
+    });
+    
+    // Modais - clicar fora
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModals();
+        });
+    });
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
+    
     btn.textContent = 'Entrando...';
     btn.disabled = true;
     
     try {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        
         const result = await api.login(email, password);
         closeModals();
-        UI.showUserUI(result.user.credits);
+        showUserUI(result.user.credits);
         showNotification('Login realizado com sucesso!', 'success');
     } catch (error) {
-        console.error('Login error:', error);
-        showNotification(error.message || 'Erro ao fazer login. Tente novamente.', 'error');
+        showNotification(error.message || 'Erro ao fazer login', 'error');
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
     }
 }
 
-async function handleRegister(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('registerName').value;
-    const email = document.getElementById('registerEmail').value;
-    const password = document.getElementById('registerPassword').value;
-    const btn = event.target.querySelector('button[type="submit"]');
-    
-    // Loading state
+async function handleRegister(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
-    btn.textContent = 'Criando conta...';
+    
+    btn.textContent = 'Criando...';
     btn.disabled = true;
     
     try {
+        const name = document.getElementById('registerName').value;
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        
         const result = await api.register(name, email, password);
         closeModals();
-        UI.showUserUI(result.user.credits);
+        showUserUI(result.user.credits);
         showNotification('Conta criada com sucesso!', 'success');
     } catch (error) {
-        console.error('Register error:', error);
-        showNotification(error.message || 'Erro ao criar conta. Tente novamente.', 'error');
+        showNotification(error.message || 'Erro ao criar conta', 'error');
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
     }
 }
-// ========== GERAÇÃO DE IMAGEM ==========
 
-async function generateImage() {
-    if (UI.state.isGenerating) return;
-    
-    const { currentImage, currentStyle } = UI.state;
-    const prompt = UI.elements.promptInput.value.trim();
-    const strength = parseInt(UI.elements.strengthSlider.value);
-    
-    if (!currentImage) {
-        showNotification('Selecione uma imagem primeiro', 'error');
+function handleDragOver(e) {
+    e.preventDefault();
+    elements.uploadArea.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    elements.uploadArea.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    elements.uploadArea.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length) handleFile(files[0]);
+}
+
+function handleFileSelect(e) {
+    const files = e.target.files;
+    if (files.length) handleFile(files[0]);
+}
+
+function handleFile(file) {
+    if (!file.type.startsWith('image/')) {
+        showNotification('Selecione uma imagem válida', 'error');
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        showNotification('Imagem muito grande. Máximo 10MB.', 'error');
         return;
     }
     
-    if (!prompt) {
-        showNotification('Digite uma descrição para a transformação', 'error');
-        return;
-    }
+    state.currentImage = file;
     
-    UI.state.isGenerating = true;
-    UI.updateGenerateButton();
-    
-    // Mostrar preview imediatamente
     const reader = new FileReader();
-    reader.onload = async (e) => {
-        UI.showResult(e.target.result, null, 'processing');
-        
-        try {
-            // Chamar API com nova rota
-            const result = await api.generateImage(
-                currentImage,
-                prompt,
-                strength,
-                currentStyle
-            );
-            
-            showNotification('Geração iniciada! Aguarde...', 'info');
-            
-            // Atualizar créditos
-            UI.updateCredits(result.data.creditsRemaining);
-            
-            // Polling para verificar status
-            startPolling(result.data.generationId);
-            
-        } catch (error) {
-            showNotification(error.message || 'Erro ao iniciar geração', 'error');
-            UI.state.isGenerating = false;
-            UI.updateGenerateButton();
-            UI.elements.statusBadge.textContent = 'Falhou';
-            UI.elements.statusBadge.classList.add('failed');
-        }
+    reader.onload = (e) => {
+        elements.previewImage.src = e.target.result;
+        elements.previewImage.classList.remove('hidden');
+        elements.uploadPlaceholder.classList.add('hidden');
+        elements.removeImage.classList.add('hidden');
+        updateGenerateButton();
     };
-    reader.readAsDataURL(currentImage);
+    reader.readAsDataURL(file);
+}
+
+function updateCharCount() {
+    const length = elements.promptInput.value.length;
+    elements.charCount.textContent = `${length}/1000`;
+    elements.charCount.style.color = length > 1000 ? 'var(--error)' : 'var(--text-secondary)';
+    updateGenerateButton();
+}
+
+function updateGenerateButton() {
+    const hasImage = !!state.currentImage;
+    const hasPrompt = elements.promptInput.value.trim().length > 0;
+    const isLogged = !!localStorage.getItem('morph_token');
+    
+    elements.generateBtn.disabled = !hasImage || !hasPrompt || state.isGenerating;
+    
+    if (!isLogged) {
+        elements.generateText.textContent = 'Faça login para gerar';
+    } else if (state.isGenerating) {
+        elements.generateText.textContent = 'Gerando...';
+    } else {
+        elements.generateText.textContent = 'Gerar Imagem';
+    }
+}
+
+function showResult(originalUrl, transformedUrl = null, status = 'processing') {
+    elements.resultSection.classList.remove('hidden');
+    elements.resultOriginal.src = originalUrl;
+    
+    if (transformedUrl) {
+        elements.resultTransformed.src = transformedUrl;
+        elements.resultTransformed.classList.remove('loading');
+        elements.loadingOverlay.classList.add('hidden');
+        elements.statusBadge.textContent = 'Concluído';
+        elements.statusBadge.classList.add('completed');
+        elements.resultActions.classList.remove('hidden');
+    } else {
+        elements.resultTransformed.classList.add('loading');
+        elements.loadingOverlay.classList.remove('hidden');
+        elements.statusBadge.textContent = 'Processando...';
+        elements.statusBadge.classList.remove('completed', 'failed');
+        elements.resultActions.classList.add('hidden');
+    }
+    
+    elements.resultSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 function startPolling(generationId) {
-    // Limpar polling anterior se existir
-    if (UI.state.pollingInterval) {
-        clearInterval(UI.state.pollingInterval);
-    }
+    if (state.pollingInterval) clearInterval(state.pollingInterval);
     
     let attempts = 0;
-    const maxAttempts = 60; // 2 minutos (2s * 60)
+    const maxAttempts = 60;
     
-    UI.state.pollingInterval = setInterval(async () => {
+    state.pollingInterval = setInterval(async () => {
         attempts++;
         
         try {
@@ -128,137 +554,101 @@ function startPolling(generationId) {
             const data = result.data;
             
             if (data.status === 'completed') {
-                clearInterval(UI.state.pollingInterval);
-                UI.updateResult(data.outputImage, 'completed');
-                showNotification('Imagem gerada com sucesso!', 'success');
+                clearInterval(state.pollingInterval);
+                updateResult(data.outputImage, 'completed');
+                showNotification('Imagem gerada!', 'success');
             } else if (data.status === 'failed') {
-                clearInterval(UI.state.pollingInterval);
-                UI.updateResult(null, 'failed');
-                showNotification('Falha na geração: ' + (data.errorMessage || 'Erro desconhecido'), 'error');
+                clearInterval(state.pollingInterval);
+                updateResult(null, 'failed');
+                showNotification('Falha na geração', 'error');
             }
             
-            // Atualizar texto de loading
-            if (data.status === 'processing') {
-                UI.elements.loadingText.textContent = `Processando${'.'.repeat((attempts % 3) + 1)}`;
-            } else if (data.status === 'queued') {
-                UI.elements.loadingText.textContent = `Na fila (posição: ${data.queuePosition || '...'})`;
-            }
-            
+            elements.loadingText.textContent = data.status === 'processing' 
+                ? `Processando${'.'.repeat((attempts % 3) + 1)}`
+                : `Na fila...`;
+                
         } catch (error) {
-            console.error('Erro no polling:', error);
+            console.error('Polling error:', error);
         }
         
-        // Timeout
         if (attempts >= maxAttempts) {
-            clearInterval(UI.state.pollingInterval);
-            UI.updateResult(null, 'failed');
-            showNotification('Tempo limite excedido. Tente novamente.', 'error');
+            clearInterval(state.pollingInterval);
+            updateResult(null, 'failed');
         }
     }, 2000);
 }
 
-// ========== UTILIDADES ==========
-
-function removeImage() {
-    UI.removeImage();
+function updateResult(imageUrl, status) {
+    if (status === 'completed') {
+        elements.resultTransformed.src = imageUrl;
+        elements.resultTransformed.classList.remove('loading');
+        elements.loadingOverlay.classList.add('hidden');
+        elements.statusBadge.textContent = 'Concluído';
+        elements.statusBadge.classList.add('completed');
+        elements.resultActions.classList.remove('hidden');
+        state.isGenerating = false;
+        updateGenerateButton();
+        loadHistory();
+    } else if (status === 'failed') {
+        elements.statusBadge.textContent = 'Falhou';
+        elements.statusBadge.classList.add('failed');
+        state.isGenerating = false;
+        updateGenerateButton();
+    }
 }
 
-function updateStrength(value) {
-    UI.updateStrength(value);
-}
-
-function selectStyle(element) {
-    UI.selectStyle(element);
-}
-
-function enhancePrompt() {
-    const prompt = UI.elements.promptInput.value;
-    if (!prompt) {
-        showNotification('Digite um prompt primeiro', 'info');
+async function checkAuth() {
+    const token = localStorage.getItem('morph_token');
+    if (!token) {
+        showAuthUI();
         return;
     }
     
-    // Adicionar melhorias automáticas ao prompt
-    const enhancements = [
-        'highly detailed',
-        'professional quality',
-        '8k resolution'
-    ];
-    
-    const currentText = UI.elements.promptInput.value;
-    const hasEnhancement = enhancements.some(e => currentText.toLowerCase().includes(e));
-    
-    if (!hasEnhancement) {
-        UI.elements.promptInput.value = `${currentText}, highly detailed, professional quality`;
-        UI.updateCharCount();
-        showNotification('Prompt melhorado!', 'success');
-    }
-}
-
-function newGeneration() {
-    UI.elements.resultSection.classList.add('hidden');
-    UI.removeImage();
-    UI.elements.promptInput.value = '';
-    UI.updateCharCount();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function downloadImage() {
-    const img = UI.elements.resultTransformed;
-    if (!img.src) return;
-    
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = `morph-${Date.now()}.png`;
-    link.click();
-    
-    showNotification('Download iniciado', 'success');
-}
-
-function shareImage() {
-    const img = UI.elements.resultTransformed;
-    if (!img.src) return;
-    
-    if (navigator.share) {
-        navigator.share({
-            title: 'Minha criação no MORPH',
-            text: 'Veja o que criei com IA no MORPH!',
-            url: img.src
-        });
-    } else {
-        // Copiar link para clipboard
-        navigator.clipboard.writeText(img.src);
-        showNotification('Link copiado para a área de transferência', 'success');
-    }
-}
-
-async function viewGeneration(id) {
     try {
-        const result = await api.getGenerationStatus(id);
-        const data = result.data;
+        const result = await api.verifyToken();
+        showUserUI(result.user.credits);
+    } catch (error) {
+        api.logout();
+        showAuthUI();
+    }
+}
+
+function showAuthUI() {
+    elements.authSection.classList.remove('hidden');
+    elements.userSection.classList.add('hidden');
+    updateGenerateButton();
+}
+
+function showUserUI(credits) {
+    elements.authSection.classList.add('hidden');
+    elements.userSection.classList.remove('hidden');
+    elements.creditsCount.textContent = credits;
+    updateGenerateButton();
+    loadHistory();
+}
+
+function updateCredits(credits) {
+    elements.creditsCount.textContent = credits;
+}
+
+async function loadHistory() {
+    try {
+        const result = await api.getHistory();
+        const generations = result.data?.generations || [];
         
-        UI.showResult(data.inputImage, data.outputImage, data.status);
-        UI.elements.promptInput.value = data.prompt;
-        UI.updateCharCount();
-        
-        // Atualizar slider se necessário
-        if (data.settings?.strength) {
-            const strengthPercent = Math.round(data.settings.strength * 100);
-            UI.elements.strengthSlider.value = strengthPercent;
-            UI.updateStrength(strengthPercent);
+        if (generations.length === 0) {
+            elements.historyGrid.innerHTML = '<div class="history-empty"><p>Nenhuma transformação ainda</p></div>';
+            return;
         }
         
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        elements.historyGrid.innerHTML = generations.map(gen => `
+            <div class="history-item" onclick="viewGeneration('${gen.id}')">
+                <img src="${gen.outputImage || gen.inputImage}" alt="${gen.prompt}">
+            </div>
+        `).join('');
     } catch (error) {
-        showNotification('Erro ao carregar geração', 'error');
+        console.error('Erro ao carregar histórico:', error);
     }
-}
-
-// ========== CRÉDITOS ==========
-
-function showBuyCredits() {
-    UI.showModal('credits');
-    loadCreditPlans();
 }
 
 function loadCreditPlans() {
@@ -271,7 +661,7 @@ function loadCreditPlans() {
     
     const container = document.getElementById('creditPlans');
     container.innerHTML = plans.map(plan => `
-        <div class="credit-plan ${plan.popular ? 'selected' : ''}" onclick="selectCreditPlan('${plan.id}')">
+        <div class="credit-plan ${plan.popular ? 'selected' : ''}" onclick="selectCreditPlan('${plan.id}', this)">
             <div class="plan-info">
                 <h4>${plan.label}</h4>
                 <p>${plan.credits} créditos</p>
@@ -284,34 +674,21 @@ function loadCreditPlans() {
     `).join('');
 }
 
-function selectCreditPlan(planId) {
-    document.querySelectorAll('.credit-plan').forEach(p => p.classList.remove('selected'));
-    event.currentTarget.classList.add('selected');
-    
-    // Aqui você integraria com Stripe/Mercado Pago
-    showNotification(`Plano ${planId} selecionado. Integração de pagamento pendente.`, 'info');
-}
-
-// ========== NOTIFICAÇÕES ==========
-
 function showNotification(message, type = 'info') {
-    // Criar elemento de notificação
     const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
-    // Estilos inline (ou adicione ao CSS)
     notification.style.cssText = `
         position: fixed;
         top: 80px;
         right: 24px;
         padding: 16px 24px;
-        background: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--error)' : 'var(--primary)'};
+        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#8B5CF6'};
         color: white;
         border-radius: 8px;
-        box-shadow: var(--shadow-lg);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
         z-index: 9999;
         animation: slideIn 0.3s ease;
+        font-weight: 500;
     `;
     
     document.body.appendChild(notification);
@@ -322,25 +699,27 @@ function showNotification(message, type = 'info') {
     }, 4000);
 }
 
-// ========== INICIALIZAÇÃO ==========
+// ==========================================
+// INICIALIZAÇÃO
+// ==========================================
 
-// Fechar modais ao clicar fora
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
-        closeModals();
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    initElements();
+    bindEvents();
+    checkAuth();
+    updateCharCount();
+    
+    // Adicionar CSS de animações
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
 });
-
-// Animações CSS (adicionar ao style.css)
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
