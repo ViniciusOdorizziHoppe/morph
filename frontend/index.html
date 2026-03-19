@@ -1123,7 +1123,7 @@ async function generate() {
           finalizarUI(true, statusData.imageUrl, statusData.creditos)
         } else if (statusData.status === 'error') {
           finalizarUI(false)
-          showToast('✗ Erro na geração da imagem', 'error')
+          showToast('✗ ' + (statusData.erro || 'Erro na geração da imagem'), 'error')
         }
         // se pending ou processing, continua aguardando
       } catch {

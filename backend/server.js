@@ -62,6 +62,7 @@ const Geracao = mongoose.model("Geracao", new mongoose.Schema({
   imagem: String,
   prompt: String,
   resultado: String,
+  erro: { type: String, default: null },
   status: {
     type: String,
     enum: ["pending", "processing", "done", "error"],
@@ -107,6 +108,14 @@ const upload = multer({
 
 /* ================= CORE PROCESS ================= */
 
+// timeout para o Replicate não travar infinitamente
+function comTimeout(promise, ms, mensagem) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagem)), ms))
+  ]);
+}
+
 async function processImage(jobId) {
   try {
     const job = await Geracao.findById(jobId).populate("usuario");
@@ -118,64 +127,85 @@ async function processImage(jobId) {
 
     if (user.creditos <= 0) {
       job.status = "error";
+      job.erro = "Créditos insuficientes";
       await job.save();
       return;
     }
 
     const queue = getQueue(user.plano);
 
-    await queue.add(async () => {
-      let model, input;
-
-      if (user.plano === "premium") {
-        model = "black-forest-labs/flux-dev";
-        input = { prompt: `${job.prompt}, ultra realistic, 8k`, image: job.imagem };
-      } else {
-        model = "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d";
-        input = { image: job.imagem, prompt: job.prompt, strength: 0.75 };
-      }
-
-      console.log("🚀 PROCESSANDO:", job._id);
-
-      let output;
+    // captura erro dentro da queue e repassa pro try/catch externo
+    const erroQueue = await queue.add(async () => {
       try {
-        output = await replicate.run(model, { input });
-      } catch (err) {
-        console.log("⚠️ ERRO IA, tentando novamente...");
-        if (job.tentativas < 2) {
-          job.tentativas++;
-          await job.save();
-          return processImage(jobId);
+        let model, input;
+
+        if (user.plano === "premium") {
+          model = "black-forest-labs/flux-dev";
+          input = { prompt: `${job.prompt}, ultra realistic, 8k`, image: job.imagem };
         } else {
-          throw err;
+          model = "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d";
+          input = { image: job.imagem, prompt: job.prompt, strength: 0.75 };
         }
+
+        console.log("🚀 PROCESSANDO:", job._id);
+
+        let output;
+        try {
+          // timeout de 90 segundos — evita travar indefinidamente
+          output = await comTimeout(
+            replicate.run(model, { input }),
+            90000,
+            "Replicate timeout após 90s"
+          );
+        } catch (err) {
+          console.log("⚠️ ERRO IA:", err.message);
+          if (job.tentativas < 2) {
+            job.tentativas++;
+            await job.save();
+            // reagenda fora da queue para não bloquear
+            setTimeout(() => processImage(jobId), 2000);
+            return null;
+          } else {
+            throw err;
+          }
+        }
+
+        if (!output || output.length === 0) throw new Error("Replicate retornou vazio — tente um prompt diferente");
+
+        let finalUrl;
+        if (typeof output[0] === "string") {
+          finalUrl = output[0];
+        } else {
+          const chunks = [];
+          for await (const chunk of output[0]) chunks.push(chunk);
+          const buffer = Buffer.concat(chunks);
+          const up = await cloudinary.uploader.upload(`data:image/png;base64,${buffer.toString("base64")}`);
+          finalUrl = up.secure_url;
+        }
+
+        await Usuario.findByIdAndUpdate(user._id, { $inc: { creditos: -1 } });
+
+        job.resultado = finalUrl;
+        job.status = "done";
+        await job.save();
+
+        console.log("✅ FINALIZADO:", job._id);
+        return null;
+
+      } catch (err) {
+        return err; // repassa o erro pro escopo externo
       }
-
-      if (!output || output.length === 0) throw new Error("Sem resultado");
-
-      let finalUrl;
-      if (typeof output[0] === "string") {
-        finalUrl = output[0];
-      } else {
-        const chunks = [];
-        for await (const chunk of output[0]) chunks.push(chunk);
-        const buffer = Buffer.concat(chunks);
-        const up = await cloudinary.uploader.upload(`data:image/png;base64,${buffer.toString("base64")}`);
-        finalUrl = up.secure_url;
-      }
-
-      await Usuario.findByIdAndUpdate(user._id, { $inc: { creditos: -1 } });
-
-      job.resultado = finalUrl;
-      job.status = "done";
-      await job.save();
-
-      console.log("✅ FINALIZADO:", job._id);
     });
 
+    // se a queue retornou um erro, trata aqui
+    if (erroQueue instanceof Error) throw erroQueue;
+
   } catch (err) {
-    console.error("🔥 ERRO FINAL:", err);
-    await Geracao.findByIdAndUpdate(jobId, { status: "error" });
+    console.error("🔥 ERRO FINAL:", err.message);
+    await Geracao.findByIdAndUpdate(jobId, {
+      status: "error",
+      erro: err.message
+    });
   }
 }
 
@@ -304,10 +334,10 @@ app.get("/api/status/:id", authMiddleware, async (req, res) => {
 
     const response = { status: job.status, imageUrl: job.resultado || null };
 
-    // quando finalizado, retorna créditos atualizados do usuário
     if (job.status === "done" || job.status === "error") {
       const user = await Usuario.findById(req.userId).select("creditos");
       if (user) response.creditos = user.creditos;
+      if (job.status === "error") response.erro = job.erro || "Erro ao processar imagem";
     }
 
     res.json(response);
