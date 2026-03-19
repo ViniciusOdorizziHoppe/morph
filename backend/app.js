@@ -9,13 +9,16 @@ const creditRoutes = require('./routes/creditRoutes');
 
 const app = express();
 
+// ✅ CORREÇÃO: Trust proxy para Koyeb/Vercel
+app.set('trust proxy', 1);
+
 // CORS
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting (agora funciona corretamente)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -39,9 +42,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes
+// Routes NOVAS
 app.use('/api/images', imageRoutes);
 app.use('/api/credits', creditRoutes);
+
+// ✅ ROTA LEGACY: Redirecionar rotas antigas para novas (temporário)
+app.post('/api/transform', (req, res) => {
+  res.redirect(307, '/api/images/generate');
+});
+
+app.get('/api/historico', (req, res) => {
+  res.redirect(307, '/api/images/generations');
+});
 
 // 404
 app.use((req, res) => {
