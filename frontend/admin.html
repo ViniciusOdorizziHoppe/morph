@@ -677,7 +677,7 @@ tr:hover td { background: rgba(124,58,237,0.04); }
     <button class="btn-entrar" id="btnEntrar" onclick="fazerLogin()">Entrar como Admin</button>
     <div class="setup-box">
       <strong>Primeiro acesso?</strong> Abra o console e rode:<br>
-      <code>setupAdmin("seu@email.com", "SUA_ADMIN_SECRET")</code>
+      <code>setupAdmin("<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="86f5e3f3c6e3ebe7efeaa8e5e9eb">[email&#160;protected]</a>", "SUA_ADMIN_SECRET")</code>
     </div>
   </div>
 </div>
@@ -879,7 +879,7 @@ tr:hover td { background: rgba(124,58,237,0.04); }
 
 <div class="toast" id="toast"></div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script data-cfasync="false">
 const API = 'https://realistic-viper-morph-82184336.koyeb.app'
 
 let token = localStorage.getItem('morph_admin_token')
@@ -1246,10 +1246,4 @@ function renderPaginacao(tipo, page, pages, total) {
 // ─── UTILS ─────────────────────────────────────────────────────
 function formatarData(iso) {
   if (!iso) return '—'
-  const d = new Date(iso)
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
-    ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
-
-function showToast(msg, type = '') {
-  c
+  const d = new Date(
