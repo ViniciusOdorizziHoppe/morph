@@ -47,14 +47,28 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-/* ================= MODELS ================= */
+/* ================= ADMIN MIDDLEWARE ================= */
+
+const adminMiddleware = async (req, res, next) => {
+  try {
+    const user = await Usuario.findById(req.userId).select("isAdmin");
+    if (!user || !user.isAdmin) return res.status(403).json({ error: "Acesso negado" });
+    next();
+  } catch {
+    res.status(500).json({ error: "Erro ao verificar permissão" });
+  }
+};
+
+
 
 const Usuario = mongoose.model("Usuario", new mongoose.Schema({
   email: String,
   senha: String,
   plano: { type: String, default: "free" },
   creditos: { type: Number, default: 5 },
-  lastRequest: { type: Date }
+  isAdmin: { type: Boolean, default: false },
+  lastRequest: { type: Date },
+  createdAt: { type: Date, default: Date.now }
 }));
 
 const Geracao = mongoose.model("Geracao", new mongoose.Schema({
@@ -255,7 +269,7 @@ app.post("/api/auth/login", async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "morph_secret_key", { expiresIn: "7d" });
     res.json({
       token,
-      usuario: { id: user._id, nome: user.email.split("@")[0], email: user.email, plano: user.plano, creditos: user.creditos }
+      usuario: { id: user._id, nome: user.email.split("@")[0], email: user.email, plano: user.plano, creditos: user.creditos, isAdmin: user.isAdmin || false }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -354,6 +368,194 @@ app.get("/api/historico", authMiddleware, async (req, res) => {
       .limit(20)
       .select("resultado prompt createdAt");
     res.json(historico);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ================= ADMIN ROTAS ================= */
+
+// Dashboard — stats gerais
+app.get("/api/admin/dashboard", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const agora = new Date();
+    const inicioHoje = new Date(agora); inicioHoje.setHours(0,0,0,0);
+    const inicio7d   = new Date(agora - 7 * 86400000);
+    const inicio30d  = new Date(agora - 30 * 86400000);
+
+    const [
+      totalUsuarios, usuariosHoje, usuarios7d, usuarios30d,
+      totalGeracoes, geracoesHoje, geracoes7d,
+      geracoesDone, geracoesError,
+      topUsuarios
+    ] = await Promise.all([
+      Usuario.countDocuments(),
+      Usuario.countDocuments({ createdAt: { $gte: inicioHoje } }),
+      Usuario.countDocuments({ createdAt: { $gte: inicio7d } }),
+      Usuario.countDocuments({ createdAt: { $gte: inicio30d } }),
+      Geracao.countDocuments(),
+      Geracao.countDocuments({ createdAt: { $gte: inicioHoje } }),
+      Geracao.countDocuments({ createdAt: { $gte: inicio7d } }),
+      Geracao.countDocuments({ status: "done" }),
+      Geracao.countDocuments({ status: "error" }),
+      Geracao.aggregate([
+        { $match: { status: "done" } },
+        { $group: { _id: "$usuario", total: { $sum: 1 } } },
+        { $sort: { total: -1 } },
+        { $limit: 10 },
+        { $lookup: { from: "usuarios", localField: "_id", foreignField: "_id", as: "user" } },
+        { $unwind: "$user" },
+        { $project: { email: "$user.email", plano: "$user.plano", creditos: "$user.creditos", total: 1 } }
+      ])
+    ]);
+
+    // gerações por dia nos últimos 7 dias
+    const geracoesPorDia = await Geracao.aggregate([
+      { $match: { createdAt: { $gte: inicio7d } } },
+      { $group: {
+        _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+        total: { $sum: 1 },
+        sucesso: { $sum: { $cond: [{ $eq: ["$status", "done"] }, 1, 0] } }
+      }},
+      { $sort: { _id: 1 } }
+    ]);
+
+    // taxa de sucesso
+    const taxaSucesso = totalGeracoes > 0
+      ? Math.round((geracoesDone / totalGeracoes) * 100)
+      : 0;
+
+    res.json({
+      usuarios: { total: totalUsuarios, hoje: usuariosHoje, ultimos7d: usuarios7d, ultimos30d: usuarios30d },
+      geracoes: { total: totalGeracoes, hoje: geracoesHoje, ultimos7d: geracoes7d, sucesso: geracoesDone, erro: geracoesError, taxaSucesso },
+      geracoesPorDia,
+      topUsuarios
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Lista todos os usuários com paginação
+app.get("/api/admin/usuarios", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const page  = parseInt(req.query.page)  || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const busca = req.query.busca || "";
+
+    const filtro = busca ? { email: { $regex: busca, $options: "i" } } : {};
+
+    const [usuarios, total] = await Promise.all([
+      Usuario.find(filtro)
+        .select("-senha")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Usuario.countDocuments(filtro)
+    ]);
+
+    // adiciona contagem de gerações por usuário
+    const ids = usuarios.map(u => u._id);
+    const contagens = await Geracao.aggregate([
+      { $match: { usuario: { $in: ids }, status: "done" } },
+      { $group: { _id: "$usuario", total: { $sum: 1 } } }
+    ]);
+    const mapaContagens = Object.fromEntries(contagens.map(c => [String(c._id), c.total]));
+
+    const resultado = usuarios.map(u => ({
+      ...u.toObject(),
+      totalGeracoes: mapaContagens[String(u._id)] || 0
+    }));
+
+    res.json({ usuarios: resultado, total, pages: Math.ceil(total / limit), page });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Editar usuário (créditos, plano, isAdmin)
+app.patch("/api/admin/usuarios/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { creditos, plano, isAdmin } = req.body;
+    const update = {};
+    if (creditos !== undefined) update.creditos = Number(creditos);
+    if (plano    !== undefined) update.plano    = plano;
+    if (isAdmin  !== undefined) update.isAdmin  = isAdmin;
+
+    const user = await Usuario.findByIdAndUpdate(req.params.id, update, { new: true }).select("-senha");
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Deletar usuário
+app.delete("/api/admin/usuarios/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await Promise.all([
+      Usuario.findByIdAndDelete(req.params.id),
+      Geracao.deleteMany({ usuario: req.params.id })
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Lista gerações recentes com filtro
+app.get("/api/admin/geracoes", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const page   = parseInt(req.query.page)   || 1;
+    const limit  = parseInt(req.query.limit)  || 20;
+    const status = req.query.status || "";
+
+    const filtro = status ? { status } : {};
+
+    const [geracoes, total] = await Promise.all([
+      Geracao.find(filtro)
+        .populate("usuario", "email plano")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Geracao.countDocuments(filtro)
+    ]);
+
+    res.json({ geracoes, total, pages: Math.ceil(total / limit), page });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Promover usuário a admin pelo email (rota de setup inicial)
+app.post("/api/admin/promover", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await Usuario.findOneAndUpdate({ email }, { isAdmin: true }, { new: true }).select("-senha");
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Setup: torna o primeiro usuário admin
+// Requer ADMIN_SECRET no body — defina a variável de ambiente ADMIN_SECRET no Koyeb
+app.post("/api/admin/setup", async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+
+    // bloqueia se não tiver ADMIN_SECRET configurado ou se a senha estiver errada
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) return res.status(403).json({ error: "ADMIN_SECRET não configurado no servidor" });
+    if (secret !== adminSecret) return res.status(403).json({ error: "Senha secreta incorreta" });
+
+    const jaTemAdmin = await Usuario.findOne({ isAdmin: true });
+    if (jaTemAdmin) return res.status(403).json({ error: "Admin já configurado — use /api/admin/promover" });
+
+    const user = await Usuario.findOneAndUpdate({ email }, { isAdmin: true }, { new: true }).select("-senha");
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado — cadastre-se primeiro" });
+    res.json({ ok: true, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

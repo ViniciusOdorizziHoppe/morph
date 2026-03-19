@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MORPH — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07070f;
+  --surface: #0e0e1c;
+  --surface2: #13132a;
+  --border: #1c1c35;
+  --accent: #7c3aed;
+  --accent2: #06b6d4;
+  --text: #e8e8f0;
+  --muted: #6b6b8a;
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+/* LAYOUT */
+.layout { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo .logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, #a78bfa, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sidebar-logo .badge {
+  font-size: 0.65rem;
+  background: rgba(124,58,237,0.2);
+  border: 1px solid rgba(124,58,237,0.4);
+  color: #a78bfa;
+  padding: 2px 8px;
+  border-radius: 100px;
+  margin-left: 8px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.nav-items { padding: 16px 12px; flex: 1; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: rgba(124,58,237,0.15); color: #a78bfa; }
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+.sidebar-footer {
+  padding: 16px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+
+.admin-email { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.btn-sair {
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-sair:hover { border-color: var(--error); color: var(--error); }
+
+/* MAIN */
+.main { margin-left: 240px; padding: 32px; min-height: 100vh; }
+
+/* TOPBAR */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.page-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.page-subtitle { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+.btn-refresh {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-refresh:hover { border-color: var(--accent); color: #a78bfa; }
+
+/* SECTIONS */
+.section { display: none; }
+.section.active { display: block; }
+
+/* STATS GRID */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1100px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-sub { font-size: 0.78rem; color: var(--muted); }
+.stat-sub strong { color: var(--success); }
+.stat-sub.warn strong { color: var(--warning); }
+.stat-sub.err strong { color: var(--error); }
+
+/* GRID 2 COL */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* CHART BARRAS */
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100px;
+}
+
+.chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.chart-bar-wrap { width: 100%; display: flex; align-items: flex-end; height: 80px; }
+.chart-bar {
+  width: 100%;
+  background: linear-gradient(to top, var(--accent), #a78bfa);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.5s ease;
+}
+.chart-day { font-size: 0.65rem; color: var(--muted); }
+
+/* TOP USERS */
+.top-list { display: flex; flex-direction: column; gap: 8px; }
+
+.top-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 10px;
+}
+
+.top-rank {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.top-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+
+.top-info { flex: 1; overflow: hidden; }
+.top-email { font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-plano { font-size: 0.7rem; color: var(--muted); }
+.top-count { font-family: 'Syne', sans-serif; font-size: 0.88rem; font-weight: 700; color: #a78bfa; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 12px;
+  font-size: 0.84rem;
+  border-bottom: 1px solid rgba(28,28,53,0.5);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(124,58,237,0.04); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-size: 0.7rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+}
+
+.badge-free     { background: rgba(107,107,138,0.15); color: var(--muted); }
+.badge-premium  { background: rgba(124,58,237,0.15);  color: #a78bfa; }
+.badge-done     { background: rgba(16,185,129,0.15);  color: var(--success); }
+.badge-error    { background: rgba(239,68,68,0.15);   color: var(--error); }
+.badge-pending  { background: rgba(245,158,11,0.15);  color: var(--warning); }
+.badge-admin    { background: rgba(6,182,212,0.15);   color: var(--accent2); }
+
+/* AÇÕES */
+.btn-action {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+  margin-right: 4px;
+}
+
+.btn-action:hover { border-color: var(--accent); color: #a78bfa; }
+.btn-action.danger:hover { border-color: var(--error); color: var(--error); }
+
+/* SEARCH BAR */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  outline: none;
+  flex: 1;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus { border-color: var(--accent); }
+
+.filter-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  outline: none;
+  cursor: pointer;
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination-info { font-size: 0.8rem; color: var(--muted); }
+
+.pagination-btns { display: flex; gap: 6px; }
+
+.btn-page {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-page:hover, .btn-page.active { border-color: var(--accent); color: #a78bfa; }
+.btn-page:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* MODAL EDITAR */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  animation: scaleIn 0.25s ease;
+}
+
+.modal h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.modal-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+
+.form-group { margin-bottom: 14px; }
+
+.form-label {
+  display: block;
+  font-size: 0.72rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus, .form-select:focus { border-color: var(--accent); }
+
+.modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+
+.btn-salvar {
+  flex: 1;
+  padding: 11px;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-salvar:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.4); }
+
+.btn-cancelar {
+  padding: 11px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancelar:hover { border-color: var(--muted); color: var(--text); }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 10px 22px;
+  font-size: 0.82rem;
+  z-index: 200;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  white-space: nowrap;
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: var(--success); color: var(--success); }
+.toast.error { border-color: var(--error); color: var(--error); }
+
+/* AUTH */
+#authScreen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  z-index: 500;
+}
+
+.auth-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 36px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+
+.auth-logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #a78bfa, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+
+.auth-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 28px; }
+
+.auth-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  margin-bottom: 10px;
+}
+
+.auth-input:focus { border-color: var(--accent); }
+
+.btn-entrar {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, var(--accent), #5b21b6);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.2s;
+}
+
+.btn-entrar:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+.btn-entrar:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.auth-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--error);
+  margin-bottom: 10px;
+  display: none;
+}
+
+.auth-error.show { display: block; }
+
+/* SETUP ADMIN */
+.setup-box {
+  background: rgba(6,182,212,0.05);
+  border: 1px solid rgba(6,182,212,0.2);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--accent2);
+  text-align: left;
+}
+
+.setup-box code {
+  display: block;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: #a78bfa;
+  word-break: break-all;
+}
+
+/* LOADING */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  gap: 10px;
+}
+
+.spinner-sm {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+
+/* EMPTY */
+.empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.empty .icon { font-size: 2rem; margin-bottom: 8px; }
+
+/* IMG THUMB */
+.thumb {
+  width: 40px; height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.thumb:hover { transform: scale(1.05); }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">MORPH</div>
+    <p class="auth-sub">Painel Administrativo</p>
+    <div class="auth-error" id="authError"></div>
+    <input class="auth-input" type="email" id="authEmail" placeholder="Email de admin" autocomplete="email">
+    <input class="auth-input" type="password" id="authSenha" placeholder="Senha" autocomplete="current-password">
+    <button class="btn-entrar" id="btnEntrar" onclick="fazerLogin()">Entrar como Admin</button>
+    <div class="setup-box">
+      <strong>Primeiro acesso?</strong> Abra o console e rode:<br>
+      <code>setupAdmin("seu@email.com", "SUA_ADMIN_SECRET")</code>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout" id="appLayout" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo">MORPH</span>
+      <span class="badge">ADMIN</span>
+    </div>
+    <nav class="nav-items">
+      <button class="nav-item active" onclick="irPara('dashboard', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </button>
+      <button class="nav-item" onclick="irPara('usuarios', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Usuários
+      </button>
+      <button class="nav-item" onclick="irPara('geracoes', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        Gerações
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-avatar" id="adminAvatar">A</div>
+        <div class="admin-email" id="adminEmail">admin</div>
+      </div>
+      <button class="btn-sair" onclick="sair()">Sair</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="section active" id="sec-dashboard">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-subtitle">Visão geral do MORPH</div>
+        </div>
+        <button class="btn-refresh" onclick="carregarDashboard()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          Atualizar
+        </button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="loading"><div class="spinner-sm"></div> Carregando...</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Gerações por dia (7 dias)</div>
+          <div class="chart-bars" id="chartBars">
+            <div class="loading"><div class="spinner-sm"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Top usuários</div>
+          <div class="top-list" id="topList">
+            <div class="loading"><div class="spinner-sm"></div> Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div class="section" id="sec-usuarios">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Usuários</div>
+          <div class="page-subtitle" id="totalUsuariosLabel">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="search-bar">
+          <input class="search-input" type="text" id="buscaUsuario" placeholder="Buscar por email..." oninput="debounce(buscarUsuarios, 400)()">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Plano</th>
+                <th>Créditos</th>
+                <th>Gerações</th>
+                <th>Cadastro</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaUsuarios">
+              <tr><td colspan="6"><div class="loading"><div class="spinner-sm"></div> Carregando...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div class="pagination-info" id="paginacaoUsuariosInfo">—</div>
+          <div class="pagination-btns" id="paginacaoUsuariosBtns"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GERAÇÕES -->
+    <div class="section" id="sec-geracoes">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Gerações</div>
+          <div class="page-subtitle" id="totalGeracoesLabel">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="search-bar">
+          <select class="filter-select" id="filtroStatus" onchange="carregarGeracoes(1)">
+            <option value="">Todos os status</option>
+            <option value="done">Concluídas</option>
+            <option value="error">Erros</option>
+            <option value="pending">Pendentes</option>
+            <option value="processing">Processando</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Resultado</th>
+                <th>Usuário</th>
+                <th>Prompt</th>
+                <th>Status</th>
+                <th>Data</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaGeracoes">
+              <tr><td colspan="5"><div class="loading"><div class="spinner-sm"></div> Carregando...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div class="pagination-info" id="paginacaoGeracoesInfo">—</div>
+          <div class="pagination-btns" id="paginacaoGeracoesBtns"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL EDITAR USUÁRIO -->
+<div class="modal-overlay" id="modalEditar">
+  <div class="modal">
+    <h3>Editar usuário</h3>
+    <p class="modal-sub" id="modalEmail">—</p>
+    <input type="hidden" id="modalUserId">
+    <div class="form-group">
+      <label class="form-label">Créditos</label>
+      <input class="form-input" type="number" id="modalCreditos" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Plano</label>
+      <select class="form-select" id="modalPlano">
+        <option value="free">Free</option>
+        <option value="premium">Premium</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Admin</label>
+      <select class="form-select" id="modalAdmin">
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-salvar" onclick="salvarUsuario()">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+const API = 'https://realistic-viper-morph-82184336.koyeb.app'
+
+let token = localStorage.getItem('morph_admin_token')
+let adminUser = JSON.parse(localStorage.getItem('morph_admin_user') || 'null')
+let paginaUsuarios = 1
+let paginaGeracoes = 1
+
+// ─── SETUP ADMIN (console) ─────────────────────────────────────
+window.setupAdmin = async (email, secret) => {
+  if (!secret) { console.error('❌ Uso: setupAdmin("email", "ADMIN_SECRET")'); return; }
+  const res = await fetch(`${API}/api/admin/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, secret })
+  })
+  const data = await res.json()
+  console.log(res.ok ? '✅ Admin configurado! Faça login agora.' : '❌ Erro:', data)
+}
+
+// ─── INIT ──────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  if (token && adminUser?.isAdmin) {
+    mostrarApp()
+    carregarDashboard()
+  }
+})
+
+// ─── AUTH ──────────────────────────────────────────────────────
+async function fazerLogin() {
+  const btn = document.getElementById('btnEntrar')
+  const errEl = document.getElementById('authError')
+  const email = document.getElementById('authEmail').value
+  const senha = document.getElementById('authSenha').value
+
+  btn.disabled = true
+  btn.textContent = 'Entrando...'
+  errEl.classList.remove('show')
+
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senha })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Credenciais inválidas')
+    if (!data.usuario?.isAdmin) throw new Error('Usuário não tem permissão de admin')
+
+    token = data.token
+    adminUser = data.usuario
+    localStorage.setItem('morph_admin_token', token)
+    localStorage.setItem('morph_admin_user', JSON.stringify(adminUser))
+
+    mostrarApp()
+    carregarDashboard()
+  } catch (err) {
+    errEl.textContent = err.message
+    errEl.classList.add('show')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Entrar como Admin'
+  }
+}
+
+document.getElementById('authSenha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') fazerLogin()
+})
+
+function mostrarApp() {
+  document.getElementById('authScreen').style.display = 'none'
+  document.getElementById('appLayout').style.display = 'flex'
+  const nome = adminUser?.email?.split('@')[0] || 'admin'
+  document.getElementById('adminEmail').textContent = adminUser?.email || ''
+  document.getElementById('adminAvatar').textContent = nome[0].toUpperCase()
+}
+
+function sair() {
+  localStorage.removeItem('morph_admin_token')
+  localStorage.removeItem('morph_admin_user')
+  token = null; adminUser = null
+  document.getElementById('authScreen').style.display = 'flex'
+  document.getElementById('appLayout').style.display = 'none'
+}
+
+// ─── NAVEGAÇÃO ─────────────────────────────────────────────────
+function irPara(sec, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'))
+  document.getElementById(`sec-${sec}`).classList.add('active')
+  btn.classList.add('active')
+
+  if (sec === 'usuarios' && document.getElementById('tabelaUsuarios').querySelector('.loading')) {
+    carregarUsuarios(1)
+  }
+  if (sec === 'geracoes' && document.getElementById('tabelaGeracoes').querySelector('.loading')) {
+    carregarGeracoes(1)
+  }
+}
+
+// ─── DASHBOARD ─────────────────────────────────────────────────
+async function carregarDashboard() {
+  try {
+    const res = await fetch(`${API}/api/admin/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+
+    // Stats
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Total de usuários</div>
+        <div class="stat-value">${d.usuarios.total}</div>
+        <div class="stat-sub"><strong>+${d.usuarios.hoje}</strong> hoje · +${d.usuarios.ultimos7d} essa semana</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total de gerações</div>
+        <div class="stat-value">${d.geracoes.total}</div>
+        <div class="stat-sub"><strong>+${d.geracoes.hoje}</strong> hoje · +${d.geracoes.ultimos7d} essa semana</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Taxa de sucesso</div>
+        <div class="stat-value">${d.geracoes.taxaSucesso}%</div>
+        <div class="stat-sub ${d.geracoes.erro > 10 ? 'warn' : ''}">
+          <strong>${d.geracoes.sucesso}</strong> ok · <span style="color:var(--error)">${d.geracoes.erro}</span> erros
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Novos (30 dias)</div>
+        <div class="stat-value">${d.usuarios.ultimos30d}</div>
+        <div class="stat-sub"><strong>usuários</strong> no último mês</div>
+      </div>
+    `
+
+    // Chart
+    const max = Math.max(...d.geracoesPorDia.map(g => g.total), 1)
+    const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+
+    document.getElementById('chartBars').innerHTML = d.geracoesPorDia.length === 0
+      ? '<div class="empty"><div class="icon">📊</div>Sem dados ainda</div>'
+      : d.geracoesPorDia.map(g => {
+          const dt = new Date(g._id)
+          const pct = Math.round((g.total / max) * 100)
+          return `
+            <div class="chart-col">
+              <div class="chart-bar-wrap">
+                <div class="chart-bar" style="height:${pct}%" title="${g.total} gerações"></div>
+              </div>
+              <div class="chart-day">${diasSemana[dt.getDay()]}</div>
+            </div>`
+        }).join('')
+
+    // Top usuários
+    document.getElementById('topList').innerHTML = d.topUsuarios.length === 0
+      ? '<div class="empty">Sem dados ainda</div>'
+      : d.topUsuarios.map((u, i) => `
+          <div class="top-item">
+            <div class="top-rank">#${i+1}</div>
+            <div class="top-avatar">${u.email[0].toUpperCase()}</div>
+            <div class="top-info">
+              <div class="top-email">${u.email}</div>
+              <div class="top-plano">${u.plano} · ${u.creditos} créditos</div>
+            </div>
+            <div class="top-count">${u.total}×</div>
+          </div>`
+        ).join('')
+
+  } catch (err) {
+    showToast('Erro ao carregar dashboard', 'error')
+    console.error(err)
+  }
+}
+
+// ─── USUÁRIOS ──────────────────────────────────────────────────
+async function carregarUsuarios(page = 1) {
+  paginaUsuarios = page
+  const busca = document.getElementById('buscaUsuario').value
+
+  document.getElementById('tabelaUsuarios').innerHTML =
+    `<tr><td colspan="6"><div class="loading"><div class="spinner-sm"></div> Carregando...</div></td></tr>`
+
+  try {
+    const res = await fetch(`${API}/api/admin/usuarios?page=${page}&limit=20&busca=${encodeURIComponent(busca)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+
+    document.getElementById('totalUsuariosLabel').textContent = `${d.total} usuários cadastrados`
+
+    if (d.usuarios.length === 0) {
+      document.getElementById('tabelaUsuarios').innerHTML =
+        `<tr><td colspan="6"><div class="empty"><div class="icon">👥</div>Nenhum usuário encontrado</div></td></tr>`
+      return
+    }
+
+    document.getElementById('tabelaUsuarios').innerHTML = d.usuarios.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#5b21b6);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;flex-shrink:0">
+              ${u.email[0].toUpperCase()}
+            </div>
+            <div>
+              <div style="font-size:0.84rem">${u.email}</div>
+              ${u.isAdmin ? '<span class="badge badge-admin">admin</span>' : ''}
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-${u.plano === 'premium' ? 'premium' : 'free'}">${u.plano}</span></td>
+        <td><strong>${u.creditos}</strong></td>
+        <td>${u.totalGeracoes}</td>
+        <td style="color:var(--muted);font-size:0.78rem">${formatarData(u.createdAt)}</td>
+        <td>
+          <button class="btn-action" onclick="abrirModalEditar(${JSON.stringify(u).replace(/"/g, '&quot;')})">Editar</button>
+          <button class="btn-action danger" onclick="deletarUsuario('${u._id}', '${u.email}')">Deletar</button>
+        </td>
+      </tr>
+    `).join('')
+
+    renderPaginacao('usuarios', d.page, d.pages, d.total)
+
+  } catch (err) {
+    showToast('Erro ao carregar usuários', 'error')
+  }
+}
+
+let debounceTimer = null
+function debounce(fn, delay) {
+  return () => {
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(fn, delay)
+  }
+}
+
+function buscarUsuarios() { carregarUsuarios(1) }
+
+// ─── MODAL EDITAR ──────────────────────────────────────────────
+function abrirModalEditar(u) {
+  document.getElementById('modalUserId').value = u._id
+  document.getElementById('modalEmail').textContent = u.email
+  document.getElementById('modalCreditos').value = u.creditos
+  document.getElementById('modalPlano').value = u.plano || 'free'
+  document.getElementById('modalAdmin').value = u.isAdmin ? 'true' : 'false'
+  document.getElementById('modalEditar').classList.add('active')
+}
+
+function fecharModal() {
+  document.getElementById('modalEditar').classList.remove('active')
+}
+
+document.getElementById('modalEditar').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalEditar')) fecharModal()
+})
+
+async function salvarUsuario() {
+  const id = document.getElementById('modalUserId').value
+  const creditos = document.getElementById('modalCreditos').value
+  const plano = document.getElementById('modalPlano').value
+  const isAdmin = document.getElementById('modalAdmin').value === 'true'
+
+  try {
+    const res = await fetch(`${API}/api/admin/usuarios/${id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creditos: Number(creditos), plano, isAdmin })
+    })
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+
+    fecharModal()
+    showToast('✓ Usuário atualizado', 'success')
+    carregarUsuarios(paginaUsuarios)
+  } catch (err) {
+    showToast('Erro: ' + err.message, 'error')
+  }
+}
+
+async function deletarUsuario(id, email) {
+  if (!confirm(`Deletar "${email}" e todas as gerações? Essa ação não pode ser desfeita.`)) return
+
+  try {
+    const res = await fetch(`${API}/api/admin/usuarios/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+
+    showToast('✓ Usuário deletado', 'success')
+    carregarUsuarios(paginaUsuarios)
+  } catch (err) {
+    showToast('Erro: ' + err.message, 'error')
+  }
+}
+
+// ─── GERAÇÕES ──────────────────────────────────────────────────
+async function carregarGeracoes(page = 1) {
+  paginaGeracoes = page
+  const status = document.getElementById('filtroStatus').value
+
+  document.getElementById('tabelaGeracoes').innerHTML =
+    `<tr><td colspan="5"><div class="loading"><div class="spinner-sm"></div> Carregando...</div></td></tr>`
+
+  try {
+    const res = await fetch(`${API}/api/admin/geracoes?page=${page}&limit=20&status=${status}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+
+    document.getElementById('totalGeracoesLabel').textContent = `${d.total} gerações no total`
+
+    if (d.geracoes.length === 0) {
+      document.getElementById('tabelaGeracoes').innerHTML =
+        `<tr><td colspan="5"><div class="empty"><div class="icon">🎨</div>Nenhuma geração encontrada</div></td></tr>`
+      return
+    }
+
+    document.getElementById('tabelaGeracoes').innerHTML = d.geracoes.map(g => `
+      <tr>
+        <td>
+          ${g.resultado
+            ? `<img class="thumb" src="${g.resultado}" onclick="window.open('${g.resultado}','_blank')" title="Ver imagem">`
+            : `<div style="width:40px;height:40px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:var(--muted)">${g.status === 'error' ? '✗' : '…'}</div>`
+          }
+        </td>
+        <td style="font-size:0.8rem;color:var(--muted)">${g.usuario?.email || '—'}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem" title="${g.prompt || ''}">${g.prompt || '—'}</td>
+        <td><span class="badge badge-${g.status}">${g.status}</span>${g.erro ? `<div style="font-size:0.7rem;color:var(--error);margin-top:2px">${g.erro}</div>` : ''}</td>
+        <td style="color:var(--muted);font-size:0.78rem">${formatarData(g.createdAt)}</td>
+      </tr>
+    `).join('')
+
+    renderPaginacao('geracoes', d.page, d.pages, d.total)
+
+  } catch (err) {
+    showToast('Erro ao carregar gerações', 'error')
+  }
+}
+
+// ─── PAGINAÇÃO ─────────────────────────────────────────────────
+function renderPaginacao(tipo, page, pages, total) {
+  const info = document.getElementById(`paginacao${tipo.charAt(0).toUpperCase() + tipo.slice(1)}Info`)
+  const btns = document.getElementById(`paginacao${tipo.charAt(0).toUpperCase() + tipo.slice(1)}Btns`)
+
+  info.textContent = `Página ${page} de ${pages} · ${total} registros`
+
+  const fn = tipo === 'usuarios' ? carregarUsuarios : carregarGeracoes
+
+  let html = `<button class="btn-page" onclick="${tipo === 'usuarios' ? 'carregarUsuarios' : 'carregarGeracoes'}(${page - 1})" ${page <= 1 ? 'disabled' : ''}>← Anterior</button>`
+
+  const inicio = Math.max(1, page - 2)
+  const fim = Math.min(pages, page + 2)
+  for (let i = inicio; i <= fim; i++) {
+    html += `<button class="btn-page ${i === page ? 'active' : ''}" onclick="${tipo === 'usuarios' ? 'carregarUsuarios' : 'carregarGeracoes'}(${i})">${i}</button>`
+  }
+
+  html += `<button class="btn-page" onclick="${tipo === 'usuarios' ? 'carregarUsuarios' : 'carregarGeracoes'}(${page + 1})" ${page >= pages ? 'disabled' : ''}>Próxima →</button>`
+
+  btns.innerHTML = html
+}
+
+// ─── UTILS ─────────────────────────────────────────────────────
+function formatarData(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+    ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function showToast(msg, type = '') {
+  c
