@@ -17,10 +17,9 @@
             </div>
             
             <div class="header-actions" id="headerActions">
-                <!-- Login ou User Info -->
                 <div id="authSection">
-                    <button class="btn btn-outline" onclick="showLogin()">Entrar</button>
-                    <button class="btn btn-primary" onclick="showRegister()">Criar conta</button>
+                    <button class="btn btn-outline" id="btnEntrar">Entrar</button>
+                    <button class="btn btn-primary" id="btnCriarConta">Criar conta</button>
                 </div>
                 
                 <div id="userSection" class="hidden">
@@ -49,7 +48,7 @@
                         <p class="upload-hint">JPG, PNG ou WebP • Máx 10MB</p>
                     </div>
                     <img id="previewImage" class="preview-image hidden" alt="Preview">
-                    <button class="btn btn-remove hidden" id="removeImage" onclick="removeImage()">✕</button>
+                    <button class="btn btn-remove hidden" id="removeImage">✕</button>
                 </div>
             </section>
 
@@ -66,7 +65,7 @@
                         rows="3"
                     ></textarea>
                     <div class="prompt-actions">
-                        <button class="btn btn-sm btn-ghost" onclick="enhancePrompt()">✨ Melhorar prompt</button>
+                        <button class="btn btn-sm btn-ghost" id="btnMelhorarPrompt">✨ Melhorar prompt</button>
                         <span class="char-count" id="charCount">0/1000</span>
                     </div>
                 </div>
@@ -75,21 +74,11 @@
                 <div class="control-group">
                     <label class="control-label">Estilo rápido</label>
                     <div class="style-chips" id="styleChips">
-                        <button class="style-chip" data-style="professional" onclick="selectStyle(this)">
-                            <span>📷</span> Profissional
-                        </button>
-                        <button class="style-chip active" data-style="anime" onclick="selectStyle(this)">
-                            <span>🌸</span> Anime
-                        </button>
-                        <button class="style-chip" data-style="artistic" onclick="selectStyle(this)">
-                            <span>🎨</span> Artístico
-                        </button>
-                        <button class="style-chip" data-style="cinematic" onclick="selectStyle(this)">
-                            <span>🎬</span> Cinemático
-                        </button>
-                        <button class="style-chip" data-style="realistic" onclick="selectStyle(this)">
-                            <span>📸</span> Realista
-                        </button>
+                        <button class="style-chip" data-style="professional">📷 Profissional</button>
+                        <button class="style-chip active" data-style="anime">🌸 Anime</button>
+                        <button class="style-chip" data-style="artistic">🎨 Artístico</button>
+                        <button class="style-chip" data-style="cinematic">🎬 Cinemático</button>
+                        <button class="style-chip" data-style="realistic">📸 Realista</button>
                     </div>
                 </div>
 
@@ -106,7 +95,6 @@
                         min="10" 
                         max="90" 
                         value="75"
-                        oninput="updateStrength(this.value)"
                     >
                     <div class="slider-labels">
                         <span>Subtle</span>
@@ -116,7 +104,7 @@
                 </div>
 
                 <!-- Generate Button -->
-                <button class="btn btn-generate" id="generateBtn" onclick="generateImage()" disabled>
+                <button class="btn btn-generate" id="generateBtn" disabled>
                     <span class="btn-icon">✨</span>
                     <span id="generateText">Gerar Imagem</span>
                     <span class="btn-price">1 crédito</span>
@@ -147,10 +135,10 @@
                     </div>
                 </div>
 
-                <div class="result-actions" id="resultActions">
-                    <button class="btn btn-primary" onclick="downloadImage()">⬇ Download</button>
-                    <button class="btn btn-outline" onclick="shareImage()">🔗 Compartilhar</button>
-                    <button class="btn btn-ghost" onclick="newGeneration()">🔄 Nova transformação</button>
+                <div class="result-actions hidden" id="resultActions">
+                    <button class="btn btn-primary" id="btnDownload">⬇ Download</button>
+                    <button class="btn btn-outline" id="btnShare">🔗 Compartilhar</button>
+                    <button class="btn btn-ghost" id="btnNova">🔄 Nova transformação</button>
                 </div>
             </section>
 
@@ -158,7 +146,6 @@
             <section class="history-section" id="historySection">
                 <h3>Histórico de transformações</h3>
                 <div class="history-grid" id="historyGrid">
-                    <!-- Carregado dinamicamente -->
                     <div class="history-empty">
                         <p>Nenhuma transformação ainda</p>
                     </div>
@@ -169,50 +156,43 @@
     </main>
 
     <!-- Modals -->
-    
-    <!-- Login Modal -->
     <div class="modal hidden" id="loginModal">
         <div class="modal-content">
-            <button class="modal-close" onclick="closeModals()">✕</button>
+            <button class="modal-close" id="closeLogin">✕</button>
             <h2>Entrar</h2>
-            <form onsubmit="handleLogin(event)">
+            <form id="formLogin">
                 <input type="email" id="loginEmail" placeholder="Email" required>
                 <input type="password" id="loginPassword" placeholder="Senha" required>
                 <button type="submit" class="btn btn-primary btn-block">Entrar</button>
             </form>
-            <p class="modal-footer">Não tem conta? <a href="#" onclick="showRegister()">Criar conta</a></p>
+            <p class="modal-footer">Não tem conta? <a href="#" id="linkCriarConta">Criar conta</a></p>
         </div>
     </div>
 
-    <!-- Register Modal -->
     <div class="modal hidden" id="registerModal">
         <div class="modal-content">
-            <button class="modal-close" onclick="closeModals()">✕</button>
+            <button class="modal-close" id="closeRegister">✕</button>
             <h2>Criar conta</h2>
-            <form onsubmit="handleRegister(event)">
+            <form id="formRegister">
                 <input type="text" id="registerName" placeholder="Nome" required>
                 <input type="email" id="registerEmail" placeholder="Email" required>
                 <input type="password" id="registerPassword" placeholder="Senha" required>
                 <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
             </form>
-            <p class="modal-footer">Já tem conta? <a href="#" onclick="showLogin()">Entrar</a></p>
+            <p class="modal-footer">Já tem conta? <a href="#" id="linkEntrar">Entrar</a></p>
         </div>
     </div>
 
-    <!-- Buy Credits Modal -->
     <div class="modal hidden" id="creditsModal">
         <div class="modal-content">
-            <button class="modal-close" onclick="closeModals()">✕</button>
+            <button class="modal-close" id="closeCredits">✕</button>
             <h2>Comprar Créditos</h2>
-            <div class="credit-plans" id="creditPlans">
-                <!-- Carregado dinamicamente -->
-            </div>
+            <div class="credit-plans" id="creditPlans"></div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts na ordem correta -->
     <script src="js/api.js"></script>
-    <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
