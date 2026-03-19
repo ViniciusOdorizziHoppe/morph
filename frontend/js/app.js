@@ -2,25 +2,19 @@
 
 // ========== AUTENTICAÇÃO ==========
 
-function showLogin() {
-    UI.showModal('login');
-}
-
-function showRegister() {
-    UI.showModal('register');
-}
-
-function closeModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.classList.add('hidden');
-    });
-}
+// ========== AUTENTICAÇÃO ==========
 
 async function handleLogin(event) {
     event.preventDefault();
     
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
+    const btn = event.target.querySelector('button[type="submit"]');
+    
+    // Loading state
+    const originalText = btn.textContent;
+    btn.textContent = 'Entrando...';
+    btn.disabled = true;
     
     try {
         const result = await api.login(email, password);
@@ -28,7 +22,11 @@ async function handleLogin(event) {
         UI.showUserUI(result.user.credits);
         showNotification('Login realizado com sucesso!', 'success');
     } catch (error) {
-        showNotification(error.message || 'Erro ao fazer login', 'error');
+        console.error('Login error:', error);
+        showNotification(error.message || 'Erro ao fazer login. Tente novamente.', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -38,6 +36,12 @@ async function handleRegister(event) {
     const name = document.getElementById('registerName').value;
     const email = document.getElementById('registerEmail').value;
     const password = document.getElementById('registerPassword').value;
+    const btn = event.target.querySelector('button[type="submit"]');
+    
+    // Loading state
+    const originalText = btn.textContent;
+    btn.textContent = 'Criando conta...';
+    btn.disabled = true;
     
     try {
         const result = await api.register(name, email, password);
@@ -45,16 +49,13 @@ async function handleRegister(event) {
         UI.showUserUI(result.user.credits);
         showNotification('Conta criada com sucesso!', 'success');
     } catch (error) {
-        showNotification(error.message || 'Erro ao criar conta', 'error');
+        console.error('Register error:', error);
+        showNotification(error.message || 'Erro ao criar conta. Tente novamente.', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
-
-function logout() {
-    api.logout();
-    UI.showAuthUI();
-    showNotification('Logout realizado', 'info');
-}
-
 // ========== GERAÇÃO DE IMAGEM ==========
 
 async function generateImage() {
