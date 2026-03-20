@@ -1,5 +1,11 @@
 require('dotenv').config();
+const cors = require("cors");
 
+app.use(cors({
+  origin: "https://morph-one-tan.vercel.app",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 const app = require('./app');
 const connectDB = require('./config/database');
 const queueService = require('./services/queueService');
