@@ -9,38 +9,39 @@ const creditRoutes = require('./routes/creditRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
-const cors = require('cors');
 
-app.use(cors({
-    origin: [
-        'https://morph-one-tan.vercel.app',
-        'http://localhost:3000', // desenvolvimento
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
-// CORS
+// CORS - Configuração única e correta
 const allowedOrigins = [
     'https://morph-one-tan.vercel.app',
     'https://morph.vercel.app',
     'http://localhost:3000',
-    'http://localhost:5500'
+    'http://localhost:5500',
+    'http://localhost:5173'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        // Permitir requisições sem origin (como apps mobile, curl, postman)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
-            callback(null, true);
-        } else {
-            callback(null, true);
+        
+        // Permitir qualquer subdomínio do vercel.app
+        if (origin.includes('vercel.app')) {
+            return callback(null, true);
         }
+        
+        // Permitir origens na lista
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+        }
+        
+        // Para desenvolvimento, permitir todas as origens
+        callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    optionsSuccessStatus: 200
 }));
 
 app.set('trust proxy', 1);
