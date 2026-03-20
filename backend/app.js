@@ -9,6 +9,17 @@ const creditRoutes = require('./routes/creditRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
+const cors = require('cors');
+
+app.use(cors({
+    origin: [
+        'https://morph-one-tan.vercel.app',
+        'http://localhost:3000', // desenvolvimento
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 
 // CORS
 const allowedOrigins = [
