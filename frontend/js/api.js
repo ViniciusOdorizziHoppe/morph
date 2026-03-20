@@ -1,6 +1,6 @@
 // Configuração da API
 const API_CONFIG = {
-    BASE_URL: 'https://transformacao.koyeb.app', // Seu backend Koyeb
+    BASE_URL: 'https://transformacao.koyeb.app',
     // BASE_URL: 'http://localhost:3001', // Desenvolvimento local
 };
 
@@ -25,7 +25,7 @@ class ApiClient {
 
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        
+
         const config = {
             ...options,
             headers: {
@@ -41,11 +41,10 @@ class ApiClient {
 
         try {
             const response = await fetch(url, config);
-            
-            // Verificar se é JSON
+
             const contentType = response.headers.get('content-type');
             let data;
-            
+
             if (contentType && contentType.includes('application/json')) {
                 data = await response.json();
             } else {
@@ -60,12 +59,11 @@ class ApiClient {
             return data;
         } catch (error) {
             console.error('API Error:', error);
-            
-            // Melhorar mensagem de erro para CORS
+
             if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
                 throw new Error('Erro de conexão com o servidor. Verifique se o backend está online.');
             }
-            
+
             throw error;
         }
     }
@@ -76,12 +74,12 @@ class ApiClient {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         });
-        
+
         if (data.token) {
             this.token = data.token;
             localStorage.setItem('morph_token', data.token);
         }
-        
+
         return data;
     }
 
@@ -90,12 +88,12 @@ class ApiClient {
             method: 'POST',
             body: JSON.stringify({ name, email, password }),
         });
-        
+
         if (data.token) {
             this.token = data.token;
             localStorage.setItem('morph_token', data.token);
         }
-        
+
         return data;
     }
 

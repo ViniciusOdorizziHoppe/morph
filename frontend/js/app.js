@@ -1,134 +1,7 @@
 // ==========================================
 // MORPH - Frontend Application
 // ==========================================
-
-// Configuração da API
-const API_CONFIG = {
-    BASE_URL: 'https://transformacao.koyeb.app', // Seu backend
-    // BASE_URL: 'http://localhost:3001', // Desenvolvimento
-};
-
-// Cliente HTTP
-class ApiClient {
-    constructor() {
-        this.baseURL = API_CONFIG.BASE_URL;
-        this.token = localStorage.getItem('morph_token');
-    }
-
-    getHeaders() {
-        const headers = {
-            'Content-Type': 'application/json',
-        };
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
-        }
-        return headers;
-    }
-
-    async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-        const config = {
-            ...options,
-            headers: {
-                ...this.getHeaders(),
-                ...options.headers,
-            },
-        };
-
-        if (options.body instanceof FormData) {
-            delete config.headers['Content-Type'];
-        }
-
-        try {
-            const response = await fetch(url, config);
-            const contentType = response.headers.get('content-type');
-            let data;
-            
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                throw new Error(text || `Erro ${response.status}`);
-            }
-
-            if (!response.ok) {
-                throw new Error(data.message || `Erro ${response.status}`);
-            }
-
-            return data;
-        } catch (error) {
-            if (error.message.includes('Failed to fetch')) {
-                throw new Error('Erro de conexão. Verifique se o backend está online.');
-            }
-            throw error;
-        }
-    }
-
-    // Auth
-    async login(email, password) {
-        const data = await this.request('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password }),
-        });
-        if (data.token) {
-            this.token = data.token;
-            localStorage.setItem('morph_token', data.token);
-        }
-        return data;
-    }
-
-    async register(name, email, password) {
-        const data = await this.request('/api/auth/register', {
-            method: 'POST',
-            body: JSON.stringify({ name, email, password }),
-        });
-        if (data.token) {
-            this.token = data.token;
-            localStorage.setItem('morph_token', data.token);
-        }
-        return data;
-    }
-
-    async verifyToken() {
-        return this.request('/api/auth/me');
-    }
-
-    logout() {
-        this.token = null;
-        localStorage.removeItem('morph_token');
-    }
-
-    // Credits
-    async getCredits() {
-        return this.request('/api/credits/balance');
-    }
-
-    // Images
-    async generateImage(imageFile, prompt, strength, style, aspectRatio = '1:1') {
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        formData.append('prompt', prompt);
-        formData.append('strength', (strength / 100).toString());
-        formData.append('style', style);
-        formData.append('aspectRatio', aspectRatio);
-
-        return this.request('/api/images/generate', {
-            method: 'POST',
-            body: formData,
-        });
-    }
-
-    async getGenerationStatus(generationId) {
-        return this.request(`/api/images/generations/${generationId}`);
-    }
-
-    async getHistory(page = 1, limit = 20) {
-        return this.request(`/api/images/generations?page=${page}&limit=${limit}`);
-    }
-}
-
-// Instância global
-const api = new ApiClient();
+// NOTA: API_CONFIG e api vêm de api.js (carregado antes deste script)
 
 // ==========================================
 // ESTADO E ELEMENTOS
@@ -196,11 +69,11 @@ window.enhancePrompt = function() {
         showNotification('Digite um prompt primeiro', 'info');
         return;
     }
-    
-    const hasEnhancement = ['highly detailed', 'professional quality', '8k'].some(e => 
+
+    const hasEnhancement = ['highly detailed', 'professional quality', '8k'].some(e =>
         prompt.toLowerCase().includes(e)
     );
-    
+
     if (!hasEnhancement) {
         elements.promptInput.value = `${prompt}, highly detailed, professional quality`;
         updateCharCount();
@@ -210,26 +83,26 @@ window.enhancePrompt = function() {
 
 window.generateImage = async function() {
     if (state.isGenerating) return;
-    
+
     const token = localStorage.getItem('morph_token');
     if (!token) {
         showLogin();
         return;
     }
-    
+
     const { currentImage, currentStyle } = state;
     const prompt = elements.promptInput.value.trim();
     const strength = parseInt(elements.strengthSlider.value);
-    
+
     if (!currentImage || !prompt) return;
-    
+
     state.isGenerating = true;
     updateGenerateButton();
-    
+
     const reader = new FileReader();
     reader.onload = async (e) => {
         showResult(e.target.result, null, 'processing');
-        
+
         try {
             const result = await api.generateImage(currentImage, prompt, strength, currentStyle);
             showNotification('Geração iniciada!', 'info');
@@ -249,7 +122,7 @@ window.generateImage = async function() {
 window.downloadImage = function() {
     const img = elements.resultTransformed;
     if (!img.src) return;
-    
+
     const link = document.createElement('a');
     link.href = img.src;
     link.download = `morph-${Date.now()}.png`;
@@ -260,7 +133,7 @@ window.downloadImage = function() {
 window.shareImage = function() {
     const img = elements.resultTransformed;
     if (!img.src) return;
-    
+
     if (navigator.share) {
         navigator.share({
             title: 'Minha criação no MORPH',
@@ -297,17 +170,17 @@ window.viewGeneration = async function(id) {
     try {
         const result = await api.getGenerationStatus(id);
         const data = result.data;
-        
+
         showResult(data.inputImage, data.outputImage, data.status);
         elements.promptInput.value = data.prompt;
         updateCharCount();
-        
+
         if (data.settings?.strength) {
             const percent = Math.round(data.settings.strength * 100);
             elements.strengthSlider.value = percent;
             updateStrength(percent);
         }
-        
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
         showNotification('Erro ao carregar', 'error');
@@ -355,12 +228,12 @@ function bindEvents() {
     // Botões header
     document.getElementById('btnEntrar').addEventListener('click', showLogin);
     document.getElementById('btnCriarConta').addEventListener('click', showRegister);
-    
+
     // Fechar modais
     document.getElementById('closeLogin').addEventListener('click', closeModals);
     document.getElementById('closeRegister').addEventListener('click', closeModals);
     document.getElementById('closeCredits').addEventListener('click', closeModals);
-    
+
     // Links modais
     document.getElementById('linkCriarConta').addEventListener('click', (e) => {
         e.preventDefault();
@@ -370,29 +243,29 @@ function bindEvents() {
         e.preventDefault();
         showLogin();
     });
-    
+
     // Forms
     elements.formLogin.addEventListener('submit', handleLogin);
     elements.formRegister.addEventListener('submit', handleRegister);
-    
+
     // Upload
     elements.uploadArea.addEventListener('click', () => elements.imageInput.click());
     elements.uploadArea.addEventListener('dragover', handleDragOver);
     elements.uploadArea.addEventListener('dragleave', handleDragLeave);
     elements.uploadArea.addEventListener('drop', handleDrop);
     elements.imageInput.addEventListener('change', handleFileSelect);
-    
+
     // Controles
     elements.promptInput.addEventListener('input', updateCharCount);
     elements.strengthSlider.addEventListener('input', (e) => updateStrength(e.target.value));
     document.getElementById('btnMelhorarPrompt').addEventListener('click', enhancePrompt);
     elements.generateBtn.addEventListener('click', generateImage);
-    
+
     // Style chips
     elements.styleChips.querySelectorAll('.style-chip').forEach(chip => {
         chip.addEventListener('click', () => selectStyle(chip));
     });
-    
+
     // Modais - clicar fora
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
@@ -405,14 +278,14 @@ async function handleLogin(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
-    
+
     btn.textContent = 'Entrando...';
     btn.disabled = true;
-    
+
     try {
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
-        
+
         const result = await api.login(email, password);
         closeModals();
         showUserUI(result.user.credits);
@@ -429,15 +302,15 @@ async function handleRegister(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
-    
+
     btn.textContent = 'Criando...';
     btn.disabled = true;
-    
+
     try {
         const name = document.getElementById('registerName').value;
         const email = document.getElementById('registerEmail').value;
         const password = document.getElementById('registerPassword').value;
-        
+
         const result = await api.register(name, email, password);
         closeModals();
         showUserUI(result.user.credits);
@@ -481,9 +354,9 @@ function handleFile(file) {
         showNotification('Imagem muito grande. Máximo 10MB.', 'error');
         return;
     }
-    
+
     state.currentImage = file;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
         elements.previewImage.src = e.target.result;
@@ -506,9 +379,9 @@ function updateGenerateButton() {
     const hasImage = !!state.currentImage;
     const hasPrompt = elements.promptInput.value.trim().length > 0;
     const isLogged = !!localStorage.getItem('morph_token');
-    
+
     elements.generateBtn.disabled = !hasImage || !hasPrompt || state.isGenerating;
-    
+
     if (!isLogged) {
         elements.generateText.textContent = 'Faça login para gerar';
     } else if (state.isGenerating) {
@@ -521,7 +394,7 @@ function updateGenerateButton() {
 function showResult(originalUrl, transformedUrl = null, status = 'processing') {
     elements.resultSection.classList.remove('hidden');
     elements.resultOriginal.src = originalUrl;
-    
+
     if (transformedUrl) {
         elements.resultTransformed.src = transformedUrl;
         elements.resultTransformed.classList.remove('loading');
@@ -536,23 +409,23 @@ function showResult(originalUrl, transformedUrl = null, status = 'processing') {
         elements.statusBadge.classList.remove('completed', 'failed');
         elements.resultActions.classList.add('hidden');
     }
-    
+
     elements.resultSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 function startPolling(generationId) {
     if (state.pollingInterval) clearInterval(state.pollingInterval);
-    
+
     let attempts = 0;
     const maxAttempts = 60;
-    
+
     state.pollingInterval = setInterval(async () => {
         attempts++;
-        
+
         try {
             const result = await api.getGenerationStatus(generationId);
             const data = result.data;
-            
+
             if (data.status === 'completed') {
                 clearInterval(state.pollingInterval);
                 updateResult(data.outputImage, 'completed');
@@ -562,15 +435,15 @@ function startPolling(generationId) {
                 updateResult(null, 'failed');
                 showNotification('Falha na geração', 'error');
             }
-            
-            elements.loadingText.textContent = data.status === 'processing' 
+
+            elements.loadingText.textContent = data.status === 'processing'
                 ? `Processando${'.'.repeat((attempts % 3) + 1)}`
                 : `Na fila...`;
-                
+
         } catch (error) {
             console.error('Polling error:', error);
         }
-        
+
         if (attempts >= maxAttempts) {
             clearInterval(state.pollingInterval);
             updateResult(null, 'failed');
@@ -603,7 +476,7 @@ async function checkAuth() {
         showAuthUI();
         return;
     }
-    
+
     try {
         const result = await api.verifyToken();
         showUserUI(result.user.credits);
@@ -635,12 +508,12 @@ async function loadHistory() {
     try {
         const result = await api.getHistory();
         const generations = result.data?.generations || [];
-        
+
         if (generations.length === 0) {
             elements.historyGrid.innerHTML = '<div class="history-empty"><p>Nenhuma transformação ainda</p></div>';
             return;
         }
-        
+
         elements.historyGrid.innerHTML = generations.map(gen => `
             <div class="history-item" onclick="viewGeneration('${gen.id}')">
                 <img src="${gen.outputImage || gen.inputImage}" alt="${gen.prompt}">
@@ -653,12 +526,12 @@ async function loadHistory() {
 
 function loadCreditPlans() {
     const plans = [
-        { id: 'starter', credits: 5, price: 4.90, label: 'Starter' },
-        { id: 'basic', credits: 12, price: 10.90, label: 'Básico', popular: true },
-        { id: 'pro', credits: 30, price: 24.90, label: 'Pro' },
+        { id: 'starter',  credits: 5,  price: 4.90,  label: 'Starter' },
+        { id: 'basic',    credits: 12, price: 10.90, label: 'Básico', popular: true },
+        { id: 'pro',      credits: 30, price: 24.90, label: 'Pro' },
         { id: 'business', credits: 80, price: 59.90, label: 'Business' }
     ];
-    
+
     const container = document.getElementById('creditPlans');
     container.innerHTML = plans.map(plan => `
         <div class="credit-plan ${plan.popular ? 'selected' : ''}" onclick="selectCreditPlan('${plan.id}', this)">
@@ -690,9 +563,9 @@ function showNotification(message, type = 'info') {
         animation: slideIn 0.3s ease;
         font-weight: 500;
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
@@ -708,17 +581,17 @@ document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     checkAuth();
     updateCharCount();
-    
-    // Adicionar CSS de animações
+
+    // Animações de notificação
     const style = document.createElement('style');
     style.textContent = `
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            to   { transform: translateX(0);    opacity: 1; }
         }
         @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
+            from { transform: translateX(0);    opacity: 1; }
+            to   { transform: translateX(100%); opacity: 0; }
         }
     `;
     document.head.appendChild(style);
