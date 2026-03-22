@@ -4,10 +4,12 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
+// MODELOS CORRETOS para img2img no Replicate (aceitam input de imagem)
+// flux-1-dev é text-to-image e não aceita 'image' como input → 404
 const MODELS = {
-  primary: "black-forest-labs/flux-1-dev",
-  secondary: "black-forest-labs/flux-1-schnell",
-  fallback: "stability-ai/stable-diffusion-xl-base-1.0"
+  primary: "fofr/flux-dev-img-to-img",        // img2img nativo com Flux Dev
+  secondary: "fofr/flux-schnell-img-to-img",  // img2img com Flux Schnell (mais rápido)
+  fallback: "stability-ai/sdxl:39ed52f2319f9693e2f464b61baef00c87a37f97b06d7789c9af3ee4f35b37bd" // SDXL img2img clássico
 };
 
 const DEFAULT_PARAMS = {

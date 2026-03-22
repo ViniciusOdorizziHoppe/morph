@@ -38,13 +38,12 @@ class ImageGenerationService {
         input: {
           image: inputImageUrl,
           prompt: promptData.prompt,
-          strength: parseFloat(strength),
+          prompt_strength: parseFloat(strength), // fofr usa prompt_strength
           num_inference_steps: goFast ? 20 : 28,
           guidance_scale: this.defaultParams.guidance_scale,
-          aspect_ratio: aspectRatio,
           output_format: this.defaultParams.output_format,
           output_quality: this.defaultParams.output_quality,
-          go_fast: goFast
+          disable_safety_checker: true
         }
       });
       
@@ -61,7 +60,7 @@ class ImageGenerationService {
       
       return {
         success: true,
-        outputUrl: prediction.output,
+        outputUrl: Array.isArray(prediction.output) ? prediction.output[0] : prediction.output,
         metadata: {
           originalPrompt: userPrompt,
           enhancedPrompt: promptData.prompt,
@@ -97,11 +96,10 @@ class ImageGenerationService {
         input: {
           image: inputImageUrl,
           prompt: promptData.prompt,
-          strength: parseFloat(options.strength) || 0.75,
+          prompt_strength: parseFloat(options.strength) || 0.75,
           num_inference_steps: 20,
           guidance_scale: 3.5,
-          aspect_ratio: options.aspectRatio || '1:1',
-          go_fast: true
+          disable_safety_checker: true
         }
       });
       
@@ -111,7 +109,7 @@ class ImageGenerationService {
       
       return {
         success: true,
-        outputUrl: prediction.output,
+        outputUrl: Array.isArray(prediction.output) ? prediction.output[0] : prediction.output,
         metadata: {
           ...promptData,
           model: this.models.secondary,
