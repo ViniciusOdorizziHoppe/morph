@@ -6,7 +6,6 @@ const errorHandler = require('./middleware/errorHandler');
 const imageRoutes = require('./routes/imageRoutes');
 const creditRoutes = require('./routes/creditRoutes');
 const authRoutes = require('./routes/authRoutes');
-let a = q
 const app = express();
 
 // CORS - Configuração única e correta
