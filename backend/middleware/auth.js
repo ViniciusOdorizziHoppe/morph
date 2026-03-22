@@ -11,7 +11,7 @@ const auth = async (req, res, next) => {
         message: 'Acesso negado. Token não fornecido.'
       });
     }
-
+    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select('-password');
     
@@ -21,14 +21,14 @@ const auth = async (req, res, next) => {
         message: 'Usuário não encontrado.'
       });
     }
-
+    
     if (user.isBanned) {
       return res.status(403).json({
         success: false,
         message: 'Conta suspensa.'
       });
     }
-
+    
     req.user = user;
     next();
   } catch (error) {

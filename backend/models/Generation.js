@@ -7,7 +7,6 @@ const generationSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  
   inputImage: {
     url: { type: String, required: true },
     publicId: { type: String, required: true },
@@ -15,7 +14,6 @@ const generationSchema = new mongoose.Schema({
     height: Number,
     format: String
   },
-  
   outputImage: {
     url: String,
     publicId: String,
@@ -23,13 +21,11 @@ const generationSchema = new mongoose.Schema({
     height: Number,
     format: String
   },
-  
   prompt: {
     original: { type: String, required: true },
     enhanced: { type: String, required: true },
     negative: String
   },
-  
   settings: {
     style: String,
     strength: { type: Number, required: true },
@@ -38,14 +34,12 @@ const generationSchema = new mongoose.Schema({
     inferenceSteps: Number,
     guidanceScale: Number
   },
-  
   status: {
     type: String,
     enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'],
     default: 'pending',
     index: true
   },
-  
   errorMessage: String,
   processingTime: Number,
   queueTime: Number,
@@ -53,7 +47,6 @@ const generationSchema = new mongoose.Schema({
   rating: { type: Number, min: 1, max: 5 },
   isPublic: { type: Boolean, default: false },
   jobId: String
-  
 }, { timestamps: true });
 
 generationSchema.index({ createdAt: -1 });

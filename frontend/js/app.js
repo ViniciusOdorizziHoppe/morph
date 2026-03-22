@@ -1,598 +1,591 @@
-// ==========================================
-// MORPH - Frontend Application
-// ==========================================
-// NOTA: API_CONFIG e api vêm de api.js (carregado antes deste script)
+/**
+ * MORPH - Frontend Application
+ * Aplicação principal para transformação de imagens com IA
+ */
 
-// ==========================================
-// ESTADO E ELEMENTOS
-// ==========================================
-
-const state = {
-    currentImage: null,
-    currentStyle: 'anime',
-    isGenerating: false,
-    pollingInterval: null
+// Estado da aplicação
+const appState = {
+  user: null,
+  credits: 0,
+  currentImage: null,
+  currentGeneration: null,
+  selectedStyle: 'anime',
+  strength: 0.75,
+  isGenerating: false
 };
 
-// Elementos DOM (inicializados no DOMContentLoaded)
-let elements = {};
+// Elementos DOM
+const elements = {};
 
-// ==========================================
-// FUNÇÕES GLOBAIS (necessárias para HTML)
-// ==========================================
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+  initializeElements();
+  initializeEventListeners();
+  checkAuth();
+  loadHistory();
+});
 
-window.showLogin = function() {
-    closeModals();
-    document.getElementById('loginModal').classList.remove('hidden');
-};
-
-window.showRegister = function() {
-    closeModals();
-    document.getElementById('registerModal').classList.remove('hidden');
-};
-
-window.closeModals = function() {
-    document.getElementById('loginModal').classList.add('hidden');
-    document.getElementById('registerModal').classList.add('hidden');
-    document.getElementById('creditsModal').classList.add('hidden');
-};
-
-window.logout = function() {
-    api.logout();
-    showAuthUI();
-    showNotification('Logout realizado', 'info');
-};
-
-window.removeImage = function() {
-    state.currentImage = null;
-    elements.imageInput.value = '';
-    elements.previewImage.src = '';
-    elements.previewImage.classList.add('hidden');
-    elements.uploadPlaceholder.classList.remove('hidden');
-    elements.removeImage.classList.add('hidden');
-    updateGenerateButton();
-};
-
-window.updateStrength = function(value) {
-    elements.strengthValue.textContent = `${value}%`;
-};
-
-window.selectStyle = function(chip) {
-    document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    state.currentStyle = chip.dataset.style;
-};
-
-window.enhancePrompt = function() {
-    const prompt = elements.promptInput.value;
-    if (!prompt) {
-        showNotification('Digite um prompt primeiro', 'info');
-        return;
-    }
-
-    const hasEnhancement = ['highly detailed', 'professional quality', '8k'].some(e =>
-        prompt.toLowerCase().includes(e)
-    );
-
-    if (!hasEnhancement) {
-        elements.promptInput.value = `${prompt}, highly detailed, professional quality`;
-        updateCharCount();
-        showNotification('Prompt melhorado!', 'success');
-    }
-};
-
-window.generateImage = async function() {
-    if (state.isGenerating) return;
-
-    const token = localStorage.getItem('morph_token');
-    if (!token) {
-        showLogin();
-        return;
-    }
-
-    const { currentImage, currentStyle } = state;
-    const prompt = elements.promptInput.value.trim();
-    const strength = parseInt(elements.strengthSlider.value);
-
-    if (!currentImage || !prompt) return;
-
-    state.isGenerating = true;
-    updateGenerateButton();
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        showResult(e.target.result, null, 'processing');
-
-        try {
-            const result = await api.generateImage(currentImage, prompt, strength, currentStyle);
-            showNotification('Geração iniciada!', 'info');
-            updateCredits(result.data.creditsRemaining);
-            startPolling(result.data.generationId);
-        } catch (error) {
-            showNotification(error.message, 'error');
-            state.isGenerating = false;
-            updateGenerateButton();
-            elements.statusBadge.textContent = 'Falhou';
-            elements.statusBadge.classList.add('failed');
-        }
-    };
-    reader.readAsDataURL(currentImage);
-};
-
-window.downloadImage = function() {
-    const img = elements.resultTransformed;
-    if (!img.src) return;
-
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = `morph-${Date.now()}.png`;
-    link.click();
-    showNotification('Download iniciado', 'success');
-};
-
-window.shareImage = function() {
-    const img = elements.resultTransformed;
-    if (!img.src) return;
-
-    if (navigator.share) {
-        navigator.share({
-            title: 'Minha criação no MORPH',
-            text: 'Veja o que criei com IA!',
-            url: img.src
-        });
-    } else {
-        navigator.clipboard.writeText(img.src);
-        showNotification('Link copiado!', 'success');
-    }
-};
-
-window.newGeneration = function() {
-    elements.resultSection.classList.add('hidden');
-    removeImage();
-    elements.promptInput.value = '';
-    updateCharCount();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-window.showBuyCredits = function() {
-    closeModals();
-    document.getElementById('creditsModal').classList.remove('hidden');
-    loadCreditPlans();
-};
-
-window.selectCreditPlan = function(planId, element) {
-    document.querySelectorAll('.credit-plan').forEach(p => p.classList.remove('selected'));
-    element.classList.add('selected');
-    showNotification(`Plano ${planId} selecionado (integração pendente)`, 'info');
-};
-
-window.viewGeneration = async function(id) {
-    try {
-        const result = await api.getGenerationStatus(id);
-        const data = result.data;
-
-        showResult(data.inputImage, data.outputImage, data.status);
-        elements.promptInput.value = data.prompt;
-        updateCharCount();
-
-        if (data.settings?.strength) {
-            const percent = Math.round(data.settings.strength * 100);
-            elements.strengthSlider.value = percent;
-            updateStrength(percent);
-        }
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) {
-        showNotification('Erro ao carregar', 'error');
-    }
-};
-
-// ==========================================
-// FUNÇÕES INTERNAS
-// ==========================================
-
-function initElements() {
-    elements = {
-        authSection: document.getElementById('authSection'),
-        userSection: document.getElementById('userSection'),
-        creditsCount: document.getElementById('creditsCount'),
-        loginModal: document.getElementById('loginModal'),
-        registerModal: document.getElementById('registerModal'),
-        creditsModal: document.getElementById('creditsModal'),
-        formLogin: document.getElementById('formLogin'),
-        formRegister: document.getElementById('formRegister'),
-        uploadArea: document.getElementById('uploadArea'),
-        imageInput: document.getElementById('imageInput'),
-        uploadPlaceholder: document.getElementById('uploadPlaceholder'),
-        previewImage: document.getElementById('previewImage'),
-        removeImage: document.getElementById('removeImage'),
-        promptInput: document.getElementById('promptInput'),
-        charCount: document.getElementById('charCount'),
-        strengthSlider: document.getElementById('strengthSlider'),
-        strengthValue: document.getElementById('strengthValue'),
-        generateBtn: document.getElementById('generateBtn'),
-        generateText: document.getElementById('generateText'),
-        resultSection: document.getElementById('resultSection'),
-        resultOriginal: document.getElementById('resultOriginal'),
-        resultTransformed: document.getElementById('resultTransformed'),
-        loadingOverlay: document.getElementById('loadingOverlay'),
-        loadingText: document.getElementById('loadingText'),
-        statusBadge: document.getElementById('statusBadge'),
-        resultActions: document.getElementById('resultActions'),
-        historyGrid: document.getElementById('historyGrid'),
-        styleChips: document.getElementById('styleChips')
-    };
+// Inicializar referências aos elementos
+function initializeElements() {
+  // Header
+  elements.authSection = document.getElementById('authSection');
+  elements.userSection = document.getElementById('userSection');
+  elements.creditsCount = document.getElementById('creditsCount');
+  elements.btnEntrar = document.getElementById('btnEntrar');
+  elements.btnCriarConta = document.getElementById('btnCriarConta');
+  
+  // Upload
+  elements.uploadArea = document.getElementById('uploadArea');
+  elements.imageInput = document.getElementById('imageInput');
+  elements.uploadPlaceholder = document.getElementById('uploadPlaceholder');
+  elements.previewImage = document.getElementById('previewImage');
+  elements.removeImage = document.getElementById('removeImage');
+  
+  // Controls
+  elements.promptInput = document.getElementById('promptInput');
+  elements.charCount = document.getElementById('charCount');
+  elements.btnMelhorarPrompt = document.getElementById('btnMelhorarPrompt');
+  elements.styleChips = document.getElementById('styleChips');
+  elements.strengthSlider = document.getElementById('strengthSlider');
+  elements.strengthValue = document.getElementById('strengthValue');
+  elements.generateBtn = document.getElementById('generateBtn');
+  elements.generateText = document.getElementById('generateText');
+  
+  // Result
+  elements.resultSection = document.getElementById('resultSection');
+  elements.statusBadge = document.getElementById('statusBadge');
+  elements.resultOriginal = document.getElementById('resultOriginal');
+  elements.resultTransformed = document.getElementById('resultTransformed');
+  elements.loadingOverlay = document.getElementById('loadingOverlay');
+  elements.loadingText = document.getElementById('loadingText');
+  elements.resultActions = document.getElementById('resultActions');
+  elements.btnDownload = document.getElementById('btnDownload');
+  elements.btnShare = document.getElementById('btnShare');
+  elements.btnNova = document.getElementById('btnNova');
+  
+  // History
+  elements.historyGrid = document.getElementById('historyGrid');
+  
+  // Modals
+  elements.loginModal = document.getElementById('loginModal');
+  elements.registerModal = document.getElementById('registerModal');
+  elements.creditsModal = document.getElementById('creditsModal');
+  elements.closeLogin = document.getElementById('closeLogin');
+  elements.closeRegister = document.getElementById('closeRegister');
+  elements.closeCredits = document.getElementById('closeCredits');
+  elements.formLogin = document.getElementById('formLogin');
+  elements.formRegister = document.getElementById('formRegister');
+  elements.linkCriarConta = document.getElementById('linkCriarConta');
+  elements.linkEntrar = document.getElementById('linkEntrar');
 }
 
-function bindEvents() {
-    // Botões header
-    document.getElementById('btnEntrar').addEventListener('click', showLogin);
-    document.getElementById('btnCriarConta').addEventListener('click', showRegister);
+// Inicializar event listeners
+function initializeEventListeners() {
+  // Upload
+  elements.uploadArea.addEventListener('click', () => elements.imageInput.click());
+  elements.imageInput.addEventListener('change', handleImageSelect);
+  elements.uploadArea.addEventListener('dragover', handleDragOver);
+  elements.uploadArea.addEventListener('dragleave', handleDragLeave);
+  elements.uploadArea.addEventListener('drop', handleDrop);
+  elements.removeImage.addEventListener('click', removeImage);
+  
+  // Prompt
+  elements.promptInput.addEventListener('input', updateCharCount);
+  elements.btnMelhorarPrompt.addEventListener('click', improvePrompt);
+  
+  // Style chips
+  elements.styleChips.addEventListener('click', handleStyleSelect);
+  
+  // Strength slider
+  elements.strengthSlider.addEventListener('input', updateStrength);
+  
+  // Generate
+  elements.generateBtn.addEventListener('click', generateImage);
+  
+  // Result actions
+  elements.btnNova.addEventListener('click', resetForm);
+  elements.btnDownload.addEventListener('click', downloadImage);
+  elements.btnShare.addEventListener('click', shareImage);
+  
+  // Auth buttons
+  elements.btnEntrar.addEventListener('click', () => showModal('login'));
+  elements.btnCriarConta.addEventListener('click', () => showModal('register'));
+  
+  // Modal close
+  elements.closeLogin.addEventListener('click', () => hideModal('login'));
+  elements.closeRegister.addEventListener('click', () => hideModal('register'));
+  elements.closeCredits.addEventListener('click', () => hideModal('credits'));
+  
+  // Forms
+  elements.formLogin.addEventListener('submit', handleLogin);
+  elements.formRegister.addEventListener('submit', handleRegister);
+  
+  // Links
+  elements.linkCriarConta.addEventListener('click', (e) => {
+    e.preventDefault();
+    hideModal('login');
+    showModal('register');
+  });
+  elements.linkEntrar.addEventListener('click', (e) => {
+    e.preventDefault();
+    hideModal('register');
+    showModal('login');
+  });
+  
+  // Close modals on outside click
+  window.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.add('hidden');
+    }
+  });
+}
 
-    // Fechar modais
-    document.getElementById('closeLogin').addEventListener('click', closeModals);
-    document.getElementById('closeRegister').addEventListener('click', closeModals);
-    document.getElementById('closeCredits').addEventListener('click', closeModals);
+// ========== AUTH ==========
 
-    // Links modais
-    document.getElementById('linkCriarConta').addEventListener('click', (e) => {
-        e.preventDefault();
-        showRegister();
-    });
-    document.getElementById('linkEntrar').addEventListener('click', (e) => {
-        e.preventDefault();
-        showLogin();
-    });
+async function checkAuth() {
+  const token = localStorage.getItem('morph_token');
+  if (!token) {
+    updateAuthUI(false);
+    return;
+  }
+  
+  try {
+    const data = await api.getMe();
+    if (data.success) {
+      appState.user = data.user;
+      appState.credits = data.user.credits;
+      updateAuthUI(true);
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    localStorage.removeItem('morph_token');
+    updateAuthUI(false);
+  }
+}
 
-    // Forms
-    elements.formLogin.addEventListener('submit', handleLogin);
-    elements.formRegister.addEventListener('submit', handleRegister);
-
-    // Upload
-    elements.uploadArea.addEventListener('click', () => elements.imageInput.click());
-    elements.uploadArea.addEventListener('dragover', handleDragOver);
-    elements.uploadArea.addEventListener('dragleave', handleDragLeave);
-    elements.uploadArea.addEventListener('drop', handleDrop);
-    elements.imageInput.addEventListener('change', handleFileSelect);
-
-    // Controles
-    elements.promptInput.addEventListener('input', updateCharCount);
-    elements.strengthSlider.addEventListener('input', (e) => updateStrength(e.target.value));
-    document.getElementById('btnMelhorarPrompt').addEventListener('click', enhancePrompt);
-    elements.generateBtn.addEventListener('click', generateImage);
-
-    // Style chips
-    elements.styleChips.querySelectorAll('.style-chip').forEach(chip => {
-        chip.addEventListener('click', () => selectStyle(chip));
-    });
-
-    // Modais - clicar fora
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModals();
-        });
-    });
+function updateAuthUI(isLoggedIn) {
+  if (isLoggedIn && appState.user) {
+    elements.authSection.classList.add('hidden');
+    elements.userSection.classList.remove('hidden');
+    elements.creditsCount.textContent = appState.credits;
+  } else {
+    elements.authSection.classList.remove('hidden');
+    elements.userSection.classList.add('hidden');
+  }
 }
 
 async function handleLogin(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.textContent;
-
-    btn.textContent = 'Entrando...';
-    btn.disabled = true;
-
-    try {
-        const email = document.getElementById('loginEmail').value;
-        const password = document.getElementById('loginPassword').value;
-
-        const result = await api.login(email, password);
-        closeModals();
-        showUserUI(result.user.credits);
-        showNotification('Login realizado com sucesso!', 'success');
-    } catch (error) {
-        showNotification(error.message || 'Erro ao fazer login', 'error');
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  try {
+    const data = await api.login(email, password);
+    if (data.success) {
+      appState.user = data.user;
+      appState.credits = data.user.credits;
+      updateAuthUI(true);
+      hideModal('login');
+      showNotification('Login realizado com sucesso!', 'success');
+      loadHistory();
     }
+  } catch (error) {
+    showNotification(error.data?.message || 'Erro ao fazer login', 'error');
+  }
 }
 
 async function handleRegister(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.textContent;
-
-    btn.textContent = 'Criando...';
-    btn.disabled = true;
-
-    try {
-        const name = document.getElementById('registerName').value;
-        const email = document.getElementById('registerEmail').value;
-        const password = document.getElementById('registerPassword').value;
-
-        const result = await api.register(name, email, password);
-        closeModals();
-        showUserUI(result.user.credits);
-        showNotification('Conta criada com sucesso!', 'success');
-    } catch (error) {
-        showNotification(error.message || 'Erro ao criar conta', 'error');
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
+  e.preventDefault();
+  const name = document.getElementById('registerName').value;
+  const email = document.getElementById('registerEmail').value;
+  const password = document.getElementById('registerPassword').value;
+  
+  try {
+    const data = await api.register(name, email, password);
+    if (data.success) {
+      appState.user = data.user;
+      appState.credits = data.user.credits;
+      updateAuthUI(true);
+      hideModal('register');
+      showNotification(`Bem-vindo! Você recebeu ${data.user.credits} créditos grátis!`, 'success');
+      loadHistory();
     }
+  } catch (error) {
+    showNotification(error.data?.message || 'Erro ao criar conta', 'error');
+  }
+}
+
+function logout() {
+  api.logout();
+  appState.user = null;
+  appState.credits = 0;
+  updateAuthUI(false);
+  showNotification('Logout realizado', 'info');
+}
+
+// ========== UPLOAD ==========
+
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (file) processImageFile(file);
 }
 
 function handleDragOver(e) {
-    e.preventDefault();
-    elements.uploadArea.classList.add('dragover');
+  e.preventDefault();
+  elements.uploadArea.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
-    e.preventDefault();
-    elements.uploadArea.classList.remove('dragover');
+  e.preventDefault();
+  elements.uploadArea.classList.remove('drag-over');
 }
 
 function handleDrop(e) {
-    e.preventDefault();
-    elements.uploadArea.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length) handleFile(files[0]);
+  e.preventDefault();
+  elements.uploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    processImageFile(file);
+  }
 }
 
-function handleFileSelect(e) {
-    const files = e.target.files;
-    if (files.length) handleFile(files[0]);
+function processImageFile(file) {
+  if (file.size > 10 * 1024 * 1024) {
+    showNotification('Imagem muito grande. Máximo 10MB.', 'error');
+    return;
+  }
+  
+  appState.currentImage = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    elements.previewImage.src = e.target.result;
+    elements.previewImage.classList.remove('hidden');
+    elements.uploadPlaceholder.classList.add('hidden');
+    elements.removeImage.classList.remove('hidden');
+    updateGenerateButton();
+  };
+  reader.readAsDataURL(file);
 }
 
-function handleFile(file) {
-    if (!file.type.startsWith('image/')) {
-        showNotification('Selecione uma imagem válida', 'error');
-        return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-        showNotification('Imagem muito grande. Máximo 10MB.', 'error');
-        return;
-    }
-
-    state.currentImage = file;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        elements.previewImage.src = e.target.result;
-        elements.previewImage.classList.remove('hidden');
-        elements.uploadPlaceholder.classList.add('hidden');
-        elements.removeImage.classList.add('hidden');
-        updateGenerateButton();
-    };
-    reader.readAsDataURL(file);
+function removeImage(e) {
+  e.stopPropagation();
+  appState.currentImage = null;
+  elements.imageInput.value = '';
+  elements.previewImage.src = '';
+  elements.previewImage.classList.add('hidden');
+  elements.uploadPlaceholder.classList.remove('hidden');
+  elements.removeImage.classList.add('hidden');
+  updateGenerateButton();
 }
+
+// ========== CONTROLS ==========
 
 function updateCharCount() {
-    const length = elements.promptInput.value.length;
-    elements.charCount.textContent = `${length}/1000`;
-    elements.charCount.style.color = length > 1000 ? 'var(--error)' : 'var(--text-secondary)';
-    updateGenerateButton();
+  const count = elements.promptInput.value.length;
+  elements.charCount.textContent = `${count}/1000`;
+}
+
+async function improvePrompt() {
+  const prompt = elements.promptInput.value.trim();
+  if (!prompt) {
+    showNotification('Digite um prompt primeiro', 'error');
+    return;
+  }
+  
+  // Simulação de melhoria de prompt
+  const improvements = {
+    'anime': 'anime style, detailed background, vibrant colors, cel shaded, beautiful detailed eyes',
+    'professional': 'professional photography, 8k resolution, highly detailed, sharp focus, studio lighting',
+    'artistic': 'digital art masterpiece, trending on artstation, intricate details, vibrant colors',
+    'realistic': 'photorealistic, RAW photo, DSLR quality, natural lighting, 8k uhd',
+    'cinematic': 'cinematic film still, depth of field, dramatic lighting, anamorphic lens'
+  };
+  
+  const improved = `${prompt}, ${improvements[appState.selectedStyle] || improvements.anime}`;
+  elements.promptInput.value = improved;
+  updateCharCount();
+  showNotification('Prompt melhorado!', 'success');
+}
+
+function handleStyleSelect(e) {
+  if (e.target.classList.contains('style-chip')) {
+    document.querySelectorAll('.style-chip').forEach(chip => {
+      chip.classList.remove('active');
+    });
+    e.target.classList.add('active');
+    appState.selectedStyle = e.target.dataset.style;
+  }
+}
+
+function updateStrength(e) {
+  appState.strength = e.target.value / 100;
+  elements.strengthValue.textContent = `${e.target.value}%`;
 }
 
 function updateGenerateButton() {
-    const hasImage = !!state.currentImage;
-    const hasPrompt = elements.promptInput.value.trim().length > 0;
-    const isLogged = !!localStorage.getItem('morph_token');
-
-    elements.generateBtn.disabled = !hasImage || !hasPrompt || state.isGenerating;
-
-    if (!isLogged) {
-        elements.generateText.textContent = 'Faça login para gerar';
-    } else if (state.isGenerating) {
-        elements.generateText.textContent = 'Gerando...';
-    } else {
-        elements.generateText.textContent = 'Gerar Imagem';
-    }
+  const hasImage = appState.currentImage !== null;
+  const hasPrompt = elements.promptInput.value.trim().length > 0;
+  elements.generateBtn.disabled = !hasImage || !hasPrompt;
 }
 
-function showResult(originalUrl, transformedUrl = null, status = 'processing') {
-    elements.resultSection.classList.remove('hidden');
-    elements.resultOriginal.src = originalUrl;
+// ========== GENERATION ==========
 
-    if (transformedUrl) {
-        elements.resultTransformed.src = transformedUrl;
-        elements.resultTransformed.classList.remove('loading');
-        elements.loadingOverlay.classList.add('hidden');
-        elements.statusBadge.textContent = 'Concluído';
-        elements.statusBadge.classList.add('completed');
-        elements.resultActions.classList.remove('hidden');
-    } else {
-        elements.resultTransformed.classList.add('loading');
-        elements.loadingOverlay.classList.remove('hidden');
-        elements.statusBadge.textContent = 'Processando...';
-        elements.statusBadge.classList.remove('completed', 'failed');
-        elements.resultActions.classList.add('hidden');
+async function generateImage() {
+  if (!appState.user) {
+    showModal('login');
+    return;
+  }
+  
+  if (appState.credits < 1) {
+    showBuyCredits();
+    return;
+  }
+  
+  if (appState.isGenerating) return;
+  
+  const prompt = elements.promptInput.value.trim();
+  if (!prompt || !appState.currentImage) {
+    showNotification('Selecione uma imagem e digite um prompt', 'error');
+    return;
+  }
+  
+  appState.isGenerating = true;
+  elements.generateBtn.disabled = true;
+  elements.generateText.textContent = 'Gerando...';
+  
+  try {
+    const data = await api.generateImage(
+      appState.currentImage,
+      prompt,
+      appState.strength,
+      appState.selectedStyle
+    );
+    
+    if (data.success) {
+      appState.credits = data.data.creditsRemaining;
+      elements.creditsCount.textContent = appState.credits;
+      appState.currentGeneration = data.data.generationId;
+      
+      showResultSection();
+      pollGenerationStatus(data.data.generationId);
     }
-
-    elements.resultSection.scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error('Generation error:', error);
+    showNotification(error.data?.message || 'Erro ao gerar imagem', 'error');
+    elements.generateBtn.disabled = false;
+    elements.generateText.textContent = 'Gerar Imagem';
+  }
+  
+  appState.isGenerating = false;
 }
 
-function startPolling(generationId) {
-    if (state.pollingInterval) clearInterval(state.pollingInterval);
-
-    let attempts = 0;
-    const maxAttempts = 60;
-
-    state.pollingInterval = setInterval(async () => {
-        attempts++;
-
-        try {
-            const result = await api.getGenerationStatus(generationId);
-            const data = result.data;
-
-            if (data.status === 'completed') {
-                clearInterval(state.pollingInterval);
-                updateResult(data.outputImage, 'completed');
-                showNotification('Imagem gerada!', 'success');
-            } else if (data.status === 'failed') {
-                clearInterval(state.pollingInterval);
-                updateResult(null, 'failed');
-                showNotification('Falha na geração', 'error');
-            }
-
-            elements.loadingText.textContent = data.status === 'processing'
-                ? `Processando${'.'.repeat((attempts % 3) + 1)}`
-                : `Na fila...`;
-
-        } catch (error) {
-            console.error('Polling error:', error);
-        }
-
-        if (attempts >= maxAttempts) {
-            clearInterval(state.pollingInterval);
-            updateResult(null, 'failed');
-        }
-    }, 2000);
+function showResultSection() {
+  elements.resultOriginal.src = elements.previewImage.src;
+  elements.resultSection.classList.remove('hidden');
+  elements.statusBadge.textContent = 'Processando...';
+  elements.statusBadge.className = 'status-badge processing';
+  elements.loadingOverlay.classList.remove('hidden');
+  elements.resultActions.classList.add('hidden');
+  elements.resultTransformed.classList.add('loading');
+  
+  elements.resultSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-function updateResult(imageUrl, status) {
-    if (status === 'completed') {
-        elements.resultTransformed.src = imageUrl;
-        elements.resultTransformed.classList.remove('loading');
-        elements.loadingOverlay.classList.add('hidden');
-        elements.statusBadge.textContent = 'Concluído';
-        elements.statusBadge.classList.add('completed');
-        elements.resultActions.classList.remove('hidden');
-        state.isGenerating = false;
-        updateGenerateButton();
-        loadHistory();
-    } else if (status === 'failed') {
-        elements.statusBadge.textContent = 'Falhou';
-        elements.statusBadge.classList.add('failed');
-        state.isGenerating = false;
-        updateGenerateButton();
-    }
-}
-
-async function checkAuth() {
-    const token = localStorage.getItem('morph_token');
-    if (!token) {
-        showAuthUI();
-        return;
-    }
-
+async function pollGenerationStatus(generationId) {
+  const pollInterval = setInterval(async () => {
     try {
-        const result = await api.verifyToken();
-        showUserUI(result.user.credits);
+      const data = await api.getGenerationStatus(generationId);
+      const generation = data.data;
+      
+      if (generation.status === 'completed') {
+        clearInterval(pollInterval);
+        elements.resultTransformed.src = generation.outputImage;
+        elements.resultTransformed.classList.remove('loading');
+        elements.loadingOverlay.classList.add('hidden');
+        elements.statusBadge.textContent = 'Concluído';
+        elements.statusBadge.className = 'status-badge completed';
+        elements.resultActions.classList.remove('hidden');
+        elements.generateBtn.disabled = false;
+        elements.generateText.textContent = 'Gerar Imagem';
+        loadHistory();
+      } else if (generation.status === 'failed') {
+        clearInterval(pollInterval);
+        elements.statusBadge.textContent = 'Falhou';
+        elements.statusBadge.className = 'status-badge failed';
+        elements.loadingOverlay.classList.add('hidden');
+        elements.generateBtn.disabled = false;
+        elements.generateText.textContent = 'Gerar Imagem';
+        showNotification('Falha na geração. Crédito reembolsado.', 'error');
+        appState.credits += 1;
+        elements.creditsCount.textContent = appState.credits;
+      }
     } catch (error) {
-        api.logout();
-        showAuthUI();
+      console.error('Poll error:', error);
     }
+  }, 3000);
 }
 
-function showAuthUI() {
-    elements.authSection.classList.remove('hidden');
-    elements.userSection.classList.add('hidden');
-    updateGenerateButton();
-}
-
-function showUserUI(credits) {
-    elements.authSection.classList.add('hidden');
-    elements.userSection.classList.remove('hidden');
-    elements.creditsCount.textContent = credits;
-    updateGenerateButton();
-    loadHistory();
-}
-
-function updateCredits(credits) {
-    elements.creditsCount.textContent = credits;
-}
+// ========== HISTORY ==========
 
 async function loadHistory() {
-    try {
-        const result = await api.getHistory();
-        const generations = result.data?.generations || [];
-
-        if (generations.length === 0) {
-            elements.historyGrid.innerHTML = '<div class="history-empty"><p>Nenhuma transformação ainda</p></div>';
-            return;
-        }
-
-        elements.historyGrid.innerHTML = generations.map(gen => `
-            <div class="history-item" onclick="viewGeneration('${gen.id}')">
-                <img src="${gen.outputImage || gen.inputImage}" alt="${gen.prompt}">
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Erro ao carregar histórico:', error);
+  if (!appState.user) {
+    elements.historyGrid.innerHTML = `
+      <div class="history-empty">
+        <p>Faça login para ver seu histórico</p>
+      </div>
+    `;
+    return;
+  }
+  
+  try {
+    const data = await api.getGenerations();
+    if (data.success && data.data.length > 0) {
+      renderHistory(data.data);
+    } else {
+      elements.historyGrid.innerHTML = `
+        <div class="history-empty">
+          <p>Nenhuma transformação ainda</p>
+        </div>
+      `;
     }
+  } catch (error) {
+    console.error('Load history error:', error);
+  }
 }
 
-function loadCreditPlans() {
-    const plans = [
-        { id: 'starter',  credits: 5,  price: 4.90,  label: 'Starter' },
-        { id: 'basic',    credits: 12, price: 10.90, label: 'Básico', popular: true },
-        { id: 'pro',      credits: 30, price: 24.90, label: 'Pro' },
-        { id: 'business', credits: 80, price: 59.90, label: 'Business' }
-    ];
+function renderHistory(generations) {
+  elements.historyGrid.innerHTML = generations.map(gen => `
+    <div class="history-item" data-id="${gen.id}">
+      <img src="${gen.outputImage || gen.inputImage}" alt="${gen.prompt}" loading="lazy">
+      <div class="history-overlay">
+        <span class="history-status ${gen.status}">${gen.status}</span>
+        <p class="history-prompt">${gen.prompt.substring(0, 50)}...</p>
+      </div>
+    </div>
+  `).join('');
+}
 
-    const container = document.getElementById('creditPlans');
-    container.innerHTML = plans.map(plan => `
-        <div class="credit-plan ${plan.popular ? 'selected' : ''}" onclick="selectCreditPlan('${plan.id}', this)">
-            <div class="plan-info">
-                <h4>${plan.label}</h4>
-                <p>${plan.credits} créditos</p>
-            </div>
-            <div class="plan-price">
-                <div class="amount">R$ ${plan.price.toFixed(2)}</div>
-                <div class="unit">R$ ${(plan.price / plan.credits).toFixed(2)}/crédito</div>
-            </div>
-        </div>
-    `).join('');
+// ========== RESULT ACTIONS ==========
+
+function resetForm() {
+  removeImage({ stopPropagation: () => {} });
+  elements.promptInput.value = '';
+  updateCharCount();
+  elements.resultSection.classList.add('hidden');
+  elements.resultTransformed.src = '';
+  elements.resultOriginal.src = '';
+  appState.currentGeneration = null;
+}
+
+async function downloadImage() {
+  if (!elements.resultTransformed.src) return;
+  
+  try {
+    const response = await fetch(elements.resultTransformed.src);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `morph-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    showNotification('Erro ao baixar imagem', 'error');
+  }
+}
+
+async function shareImage() {
+  if (!elements.resultTransformed.src) return;
+  
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Minha transformação MORPH',
+        text: 'Veja o que criei com MORPH AI!',
+        url: elements.resultTransformed.src
+      });
+    } catch (error) {
+      console.log('Share cancelled');
+    }
+  } else {
+    // Copiar link para clipboard
+    try {
+      await navigator.clipboard.writeText(elements.resultTransformed.src);
+      showNotification('Link copiado!', 'success');
+    } catch (error) {
+      showNotification('Erro ao copiar link', 'error');
+    }
+  }
+}
+
+// ========== UI HELPERS ==========
+
+function showModal(type) {
+  const modal = document.getElementById(`${type}Modal`);
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+function hideModal(type) {
+  const modal = document.getElementById(`${type}Modal`);
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+function showBuyCredits() {
+  if (!appState.user) {
+    showModal('login');
+    return;
+  }
+  showModal('credits');
 }
 
 function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 24px;
-        padding: 16px 24px;
-        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#8B5CF6'};
-        color: white;
-        border-radius: 8px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-        z-index: 9999;
-        animation: slideIn 0.3s ease;
-        font-weight: 500;
-    `;
-
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 4000);
+  // Criar elemento de notificação
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  
+  // Estilos inline para notificação
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+    background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#7c3aed'};
+  `;
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
-// ==========================================
-// INICIALIZAÇÃO
-// ==========================================
+// Adicionar animações CSS
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+`;
+document.head.appendChild(style);
 
-document.addEventListener('DOMContentLoaded', () => {
-    initElements();
-    bindEvents();
-    checkAuth();
-    updateCharCount();
-
-    // Animações de notificação
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to   { transform: translateX(0);    opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0);    opacity: 1; }
-            to   { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-});
+// Expor funções globais
+window.logout = logout;
+window.showBuyCredits = showBuyCredits;

@@ -43,7 +43,7 @@ class PromptBuilder {
     if (strength > 0.8) {
       finalPrompt += ", inspired by the reference image composition";
     }
-
+    
     return {
       prompt: this.cleanPrompt(finalPrompt),
       negativePrompt: template.negative,
@@ -52,7 +52,7 @@ class PromptBuilder {
       originalPrompt: userPrompt
     };
   }
-
+  
   static cleanPrompt(prompt) {
     return prompt
       .replace(/\s+/g, ' ')
@@ -60,7 +60,7 @@ class PromptBuilder {
       .replace(/\.\s*\./g, '.')
       .trim();
   }
-
+  
   static validate(userPrompt) {
     const errors = [];
     
@@ -77,7 +77,7 @@ class PromptBuilder {
     }
     
     const blockedWords = ['nsfw', 'nude', 'naked', 'porn', 'sex'];
-    const hasBlocked = blockedWords.some(word => 
+    const hasBlocked = blockedWords.some(word =>
       userPrompt.toLowerCase().includes(word)
     );
     

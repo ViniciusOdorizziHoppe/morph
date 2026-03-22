@@ -68,11 +68,9 @@ userSchema.methods.useCredit = async function() {
   if (this.credits < 1) {
     throw new Error('Créditos insuficientes');
   }
-  
   this.credits -= 1;
   this.totalGenerations += 1;
   await this.save();
-  
   return this.credits;
 };
 

@@ -8,7 +8,7 @@ class ImageGenerationService {
     this.models = MODELS;
     this.defaultParams = DEFAULT_PARAMS;
   }
-
+  
   async generateFromImage(inputImageUrl, userPrompt, options = {}) {
     const startTime = Date.now();
     
@@ -17,23 +17,23 @@ class ImageGenerationService {
       if (!validation.valid) {
         throw new Error(`Imagem de entrada inválida: ${validation.error}`);
       }
-
+      
       const {
         style = 'professional',
         strength = this.defaultParams.strength,
         aspectRatio = this.defaultParams.aspect_ratio,
         goFast = false
       } = options;
-
+      
       const promptData = PromptBuilder.build(userPrompt, { style, strength });
-
+      
       logger.info('Starting image generation', {
         inputImage: inputImageUrl,
         originalPrompt: userPrompt,
         enhancedPrompt: promptData.prompt,
         strength
       });
-
+      
       const prediction = await replicate.run(this.models.primary, {
         input: {
           image: inputImageUrl,
@@ -47,18 +47,18 @@ class ImageGenerationService {
           go_fast: goFast
         }
       });
-
+      
       if (!prediction || !prediction.output) {
         throw new Error('API retornou resposta vazia');
       }
-
+      
       const processingTime = (Date.now() - startTime) / 1000;
-
+      
       logger.info('Image generation completed', {
         processingTime,
         outputUrl: prediction.output
       });
-
+      
       return {
         success: true,
         outputUrl: prediction.output,
@@ -73,18 +73,17 @@ class ImageGenerationService {
           processingTime
         }
       };
-
     } catch (error) {
       logger.error('Image generation failed:', error);
       
       if (!error.message.includes('inválido') && !error.message.includes('Prompt')) {
         return this.generateWithFallback(inputImageUrl, userPrompt, options);
       }
-
+      
       throw error;
     }
   }
-
+  
   async generateWithFallback(inputImageUrl, userPrompt, options) {
     logger.warn('Trying fallback model');
     
@@ -93,7 +92,7 @@ class ImageGenerationService {
         style: options.style || 'professional',
         strength: options.strength
       });
-
+      
       const prediction = await replicate.run(this.models.secondary, {
         input: {
           image: inputImageUrl,
@@ -105,11 +104,11 @@ class ImageGenerationService {
           go_fast: true
         }
       });
-
+      
       if (!prediction || !prediction.output) {
         throw new Error('Fallback também falhou');
       }
-
+      
       return {
         success: true,
         outputUrl: prediction.output,
@@ -119,7 +118,6 @@ class ImageGenerationService {
           isFallback: true
         }
       };
-
     } catch (error) {
       logger.error('Fallback generation failed:', error);
       throw new Error('Todos os modelos de IA falharam. Tente novamente mais tarde.');

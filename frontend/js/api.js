@@ -1,146 +1,174 @@
-// Configuração da API
+/**
+ * MORPH API Client
+ * Configuração de URLs e funções de comunicação com o backend
+ */
+
+// Configuração das URLs - usar variável de ambiente ou fallback
 const API_CONFIG = {
-    BASE_URL: 'https://transformacao.koyeb.app',
-    // BASE_URL: 'http://localhost:3001', // Desenvolvimento local
+  // URL do backend - configure através de variável de ambiente no Vercel
+  // ou altere diretamente aqui para testes locais
+  BASE_URL: window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001'
+    : (window.env?.REACT_APP_API_URL || 'https://realistic-viper-morph-82184336.koyeb.app'),
+  
+  // Timeout para requisições
+  TIMEOUT: 60000,
+  
+  // Headers padrão
+  HEADERS: {
+    'Content-Type': 'application/json'
+  }
 };
 
-// Cliente HTTP
-class ApiClient {
-    constructor() {
-        this.baseURL = API_CONFIG.BASE_URL;
-        this.token = localStorage.getItem('morph_token');
+// Classe para gerenciar requisições API
+class MorphAPI {
+  constructor() {
+    this.baseURL = API_CONFIG.BASE_URL;
+    this.token = localStorage.getItem('morph_token');
+  }
+  
+  // Atualizar token
+  setToken(token) {
+    this.token = token;
+    if (token) {
+      localStorage.setItem('morph_token', token);
+    } else {
+      localStorage.removeItem('morph_token');
     }
-
-    getHeaders() {
-        const headers = {
-            'Content-Type': 'application/json',
-        };
-
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
-        }
-
-        return headers;
+  }
+  
+  // Obter headers com autenticação
+  getHeaders(includeAuth = true) {
+    const headers = { ...API_CONFIG.HEADERS };
+    if (includeAuth && this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
     }
-
-    async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-
-        const config = {
-            ...options,
-            headers: {
-                ...this.getHeaders(),
-                ...options.headers,
-            },
-        };
-
-        // Remover Content-Type se for FormData
-        if (options.body instanceof FormData) {
-            delete config.headers['Content-Type'];
-        }
-
-        try {
-            const response = await fetch(url, config);
-
-            const contentType = response.headers.get('content-type');
-            let data;
-
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                throw new Error(text || `Erro ${response.status}`);
-            }
-
-            if (!response.ok) {
-                throw new Error(data.message || `Erro ${response.status}`);
-            }
-
-            return data;
-        } catch (error) {
-            console.error('API Error:', error);
-
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                throw new Error('Erro de conexão com o servidor. Verifique se o backend está online.');
-            }
-
-            throw error;
-        }
+    return headers;
+  }
+  
+  // Requisição GET
+  async get(endpoint, requiresAuth = true) {
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: this.getHeaders(requiresAuth),
+      credentials: 'include'
+    });
+    return this.handleResponse(response);
+  }
+  
+  // Requisição POST
+  async post(endpoint, data, requiresAuth = true) {
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'POST',
+      headers: this.getHeaders(requiresAuth),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
+    return this.handleResponse(response);
+  }
+  
+  // Requisição POST com FormData (para upload de arquivos)
+  async postFormData(endpoint, formData, requiresAuth = true) {
+    const headers = {};
+    if (requiresAuth && this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
     }
-
-    // ✅ AUTENTICAÇÃO
-    async login(email, password) {
-        const data = await this.request('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password }),
-        });
-
-        if (data.token) {
-            this.token = data.token;
-            localStorage.setItem('morph_token', data.token);
-        }
-
-        return data;
+    
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData
+    });
+    return this.handleResponse(response);
+  }
+  
+  // Tratar resposta
+  async handleResponse(response) {
+    const data = await response.json();
+    
+    if (!response.ok) {
+      const error = new Error(data.message || 'Erro na requisição');
+      error.status = response.status;
+      error.data = data;
+      throw error;
     }
-
-    async register(name, email, password) {
-        const data = await this.request('/api/auth/register', {
-            method: 'POST',
-            body: JSON.stringify({ name, email, password }),
-        });
-
-        if (data.token) {
-            this.token = data.token;
-            localStorage.setItem('morph_token', data.token);
-        }
-
-        return data;
+    
+    return data;
+  }
+  
+  // ========== AUTH ==========
+  
+  async login(email, password) {
+    const data = await this.post('/api/auth/login', { email, password }, false);
+    if (data.token) {
+      this.setToken(data.token);
     }
-
-    async verifyToken() {
-        return this.request('/api/auth/me');
+    return data;
+  }
+  
+  async register(name, email, password) {
+    const data = await this.post('/api/auth/register', { name, email, password }, false);
+    if (data.token) {
+      this.setToken(data.token);
     }
-
-    logout() {
-        this.token = null;
-        localStorage.removeItem('morph_token');
-    }
-
-    // Créditos
-    async getCredits() {
-        return this.request('/api/credits/balance');
-    }
-
-    // Imagens
-    async generateImage(imageFile, prompt, strength, style, aspectRatio = '1:1') {
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        formData.append('prompt', prompt);
-        formData.append('strength', (strength / 100).toString());
-        formData.append('style', style);
-        formData.append('aspectRatio', aspectRatio);
-
-        return this.request('/api/images/generate', {
-            method: 'POST',
-            body: formData,
-        });
-    }
-
-    async getGenerationStatus(generationId) {
-        return this.request(`/api/images/generations/${generationId}`);
-    }
-
-    async getHistory(page = 1, limit = 20) {
-        return this.request(`/api/images/generations?page=${page}&limit=${limit}`);
-    }
-
-    async previewPrompt(prompt, style, strength) {
-        return this.request('/api/images/preview-prompt', {
-            method: 'POST',
-            body: JSON.stringify({ prompt, style, strength }),
-        });
-    }
+    return data;
+  }
+  
+  async getMe() {
+    return this.get('/api/auth/me');
+  }
+  
+  logout() {
+    this.setToken(null);
+  }
+  
+  // ========== IMAGES ==========
+  
+  async generateImage(file, prompt, strength, style, aspectRatio = '1:1') {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('prompt', prompt);
+    formData.append('strength', strength);
+    formData.append('style', style);
+    formData.append('aspectRatio', aspectRatio);
+    
+    return this.postFormData('/api/images/generate', formData);
+  }
+  
+  async getGenerations() {
+    return this.get('/api/images/generations');
+  }
+  
+  async getGenerationStatus(generationId) {
+    return this.get(`/api/images/generations/${generationId}`);
+  }
+  
+  // ========== CREDITS ==========
+  
+  async getCredits() {
+    return this.get('/api/credits/balance');
+  }
+  
+  // ========== USER ==========
+  
+  async getProfile() {
+    return this.get('/api/users/profile');
+  }
+  
+  async updateProfile(data) {
+    return this.post('/api/users/profile', data);
+  }
+  
+  async getStats() {
+    return this.get('/api/users/stats');
+  }
 }
 
-// Instância global
-const api = new ApiClient();
+// Instância global da API
+const api = new MorphAPI();
+
+// Exportar para uso global
+window.MorphAPI = MorphAPI;
+window.api = api;
+window.API_CONFIG = API_CONFIG;

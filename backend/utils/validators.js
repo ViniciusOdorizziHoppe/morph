@@ -5,12 +5,10 @@ const validateGenerationRequest = [
     .trim()
     .isLength({ min: 3, max: 1000 })
     .withMessage('Prompt deve ter entre 3 e 1000 caracteres'),
-  
   body('strength')
     .optional()
     .isFloat({ min: 0.1, max: 1.0 })
     .withMessage('Strength deve estar entre 0.1 e 1.0'),
-  
   body('style')
     .optional()
     .isIn(['professional', 'artistic', 'realistic', 'cinematic', 'anime'])

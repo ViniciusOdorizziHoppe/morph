@@ -10,18 +10,18 @@ class ImageController {
     try {
       const userId = req.user._id;
       const file = req.file;
-
+      
       if (!file) {
         return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
       }
-
+      
       const { prompt, strength = 0.75, style = 'professional', aspectRatio = '1:1' } = req.body;
-
+      
       const promptValidation = PromptBuilder.validate(prompt);
       if (!promptValidation.isValid) {
         return res.status(400).json({ success: false, errors: promptValidation.errors });
       }
-
+      
       const balance = await creditService.getBalance(userId);
       if (balance.credits < 1) {
         return res.status(403).json({
@@ -30,16 +30,16 @@ class ImageController {
           currentCredits: balance.credits
         });
       }
-
+      
       let uploadResult;
       try {
         uploadResult = await cloudinaryService.uploadUserImage(file.path, userId);
       } catch (error) {
         return res.status(500).json({ success: false, message: 'Falha ao processar imagem' });
       }
-
+      
       const promptData = PromptBuilder.build(prompt, { style, strength: parseFloat(strength) });
-
+      
       const generation = new Generation({
         user: userId,
         inputImage: {
@@ -62,9 +62,8 @@ class ImageController {
         },
         status: 'pending'
       });
-
       await generation.save();
-
+      
       try {
         await creditService.useCreditForGeneration(userId, generation._id);
       } catch (error) {
@@ -72,7 +71,7 @@ class ImageController {
         await Generation.findByIdAndDelete(generation._id);
         return res.status(403).json({ success: false, message: error.message });
       }
-
+      
       const queueResult = await queueService.addGenerationJob({
         generationId: generation._id,
         userId,
@@ -81,7 +80,7 @@ class ImageController {
         settings: { style, strength: parseFloat(strength), aspectRatio },
         priority: req.user.role === 'admin' ? 1 : 5
       });
-
+      
       res.status(202).json({
         success: true,
         message: 'Geração iniciada',
@@ -92,27 +91,26 @@ class ImageController {
           creditsRemaining: balance.credits - 1
         }
       });
-
     } catch (error) {
       logger.error('Upload and generate error:', error);
       next(error);
     }
   }
-
+  
   async getGenerationStatus(req, res, next) {
     try {
       const { generationId } = req.params;
       const generation = await Generation.findOne({ _id: generationId, user: req.user._id });
-
+      
       if (!generation) {
         return res.status(404).json({ success: false, message: 'Geração não encontrada' });
       }
-
+      
       let queueStatus = null;
       if (generation.jobId && generation.status === 'pending') {
         queueStatus = await queueService.getJobStatus(generation.jobId);
       }
-
+      
       res.json({
         success: true,
         data: {
@@ -128,13 +126,13 @@ class ImageController {
       next(error);
     }
   }
-
+  
   async getUserGenerations(req, res, next) {
     try {
       const generations = await Generation.find({ user: req.user._id })
         .sort({ createdAt: -1 })
         .limit(20);
-
+      
       res.json({
         success: true,
         data: generations.map(g => ({

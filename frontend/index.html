@@ -1,198 +1,213 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MORPH - Transforme suas imagens com IA</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MORPH - Transforme suas imagens com IA</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="logo">
-                <span class="logo-icon">✦</span>
-                <span class="logo-text">MORPH</span>
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <div class="logo">
+        <span class="logo-icon">✦</span>
+        <span class="logo-text">MORPH</span>
+      </div>
+      <div class="header-actions" id="headerActions">
+        <div id="authSection">
+          <button class="btn btn-outline" id="btnEntrar">Entrar</button>
+          <button class="btn btn-primary" id="btnCriarConta">Criar conta</button>
+        </div>
+        <div id="userSection" class="hidden">
+          <div class="credits-badge">
+            <span class="credits-icon">⚡</span>
+            <span id="creditsCount">0</span> créditos
+          </div>
+          <button class="btn btn-primary" onclick="showBuyCredits()">Comprar créditos</button>
+          <button class="btn btn-ghost" onclick="logout()">Sair</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Hero -->
+      <section class="hero">
+        <h1>Transforme suas imagens com <span>Inteligência Artificial</span></h1>
+        <p>Upload uma foto, descreva a transformação desejada e deixe a IA criar algo incrível.</p>
+      </section>
+
+      <!-- Upload Section -->
+      <section class="upload-section" id="uploadSection">
+        <div class="upload-area" id="uploadArea">
+          <input type="file" id="imageInput" accept="image/*" hidden>
+          <div class="upload-placeholder" id="uploadPlaceholder">
+            <div class="upload-icon">📷</div>
+            <p class="upload-text">Arraste uma imagem ou clique para upload</p>
+            <p class="upload-hint">JPG, PNG ou WebP • Máx 10MB</p>
+          </div>
+          <img id="previewImage" class="preview-image hidden" alt="Preview">
+          <button class="btn btn-remove hidden" id="removeImage">×</button>
+        </div>
+      </section>
+
+      <!-- Controls Section -->
+      <section class="controls-section" id="controlsSection">
+        <!-- Prompt -->
+        <div class="control-group">
+          <label class="control-label">Descrição da transformação</label>
+          <textarea
+            id="promptInput"
+            class="prompt-input"
+            placeholder="Ex: anime japonês estilo Studio Ghibli, cores vibrantes"
+            rows="3"
+          ></textarea>
+          <div class="prompt-actions">
+            <button class="btn btn-sm btn-ghost" id="btnMelhorarPrompt">✨ Melhorar prompt</button>
+            <span class="char-count" id="charCount">0/1000</span>
+          </div>
+        </div>
+
+        <!-- Quick Styles -->
+        <div class="control-group">
+          <label class="control-label">Estilo rápido</label>
+          <div class="style-chips" id="styleChips">
+            <button class="style-chip" data-style="professional">📸 Profissional</button>
+            <button class="style-chip active" data-style="anime">🎨 Anime</button>
+            <button class="style-chip" data-style="artistic">🖼️ Artístico</button>
+            <button class="style-chip" data-style="cinematic">🎬 Cinemático</button>
+            <button class="style-chip" data-style="realistic">📷 Realista</button>
+          </div>
+        </div>
+
+        <!-- Strength Slider -->
+        <div class="control-group">
+          <div class="slider-header">
+            <label class="control-label">Força da transformação</label>
+            <span class="slider-value" id="strengthValue">75%</span>
+          </div>
+          <input
+            type="range"
+            id="strengthSlider"
+            class="strength-slider"
+            min="10"
+            max="90"
+            value="75"
+          >
+          <div class="slider-labels">
+            <span>Subtle</span>
+            <span>Balanced</span>
+            <span>Creative</span>
+          </div>
+        </div>
+
+        <!-- Generate Button -->
+        <button class="btn btn-generate" id="generateBtn" disabled>
+          <span class="btn-icon">⚡</span>
+          <span id="generateText">Gerar Imagem</span>
+          <span class="btn-price">1 crédito</span>
+        </button>
+      </section>
+
+      <!-- Result Section -->
+      <section class="result-section hidden" id="resultSection">
+        <div class="result-header">
+          <h3>Resultado</h3>
+          <span class="status-badge" id="statusBadge">Processando...</span>
+        </div>
+        <div class="result-comparison">
+          <div class="result-box">
+            <label>Original</label>
+            <img id="resultOriginal" alt="Original">
+          </div>
+          <div class="result-arrow">→</div>
+          <div class="result-box">
+            <label>Transformada</label>
+            <img id="resultTransformed" class="loading" alt="Transformada">
+            <div class="loading-overlay" id="loadingOverlay">
+              <div class="spinner"></div>
+              <p id="loadingText">Gerando...</p>
             </div>
-            
-            <div class="header-actions" id="headerActions">
-                <div id="authSection">
-                    <button class="btn btn-outline" id="btnEntrar">Entrar</button>
-                    <button class="btn btn-primary" id="btnCriarConta">Criar conta</button>
-                </div>
-                
-                <div id="userSection" class="hidden">
-                    <div class="credits-badge">
-                        <span class="credits-icon">⚡</span>
-                        <span id="creditsCount">0</span> créditos
-                    </div>
-                    <button class="btn btn-primary" onclick="showBuyCredits()">Comprar créditos</button>
-                    <button class="btn btn-ghost" onclick="logout()">Sair</button>
-                </div>
-            </div>
+          </div>
         </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="main">
-        <div class="container">
-            
-            <!-- Upload Section -->
-            <section class="upload-section" id="uploadSection">
-                <div class="upload-area" id="uploadArea">
-                    <input type="file" id="imageInput" accept="image/*" hidden>
-                    <div class="upload-placeholder" id="uploadPlaceholder">
-                        <div class="upload-icon">📤</div>
-                        <p class="upload-text">Arraste uma imagem ou clique para upload</p>
-                        <p class="upload-hint">JPG, PNG ou WebP • Máx 10MB</p>
-                    </div>
-                    <img id="previewImage" class="preview-image hidden" alt="Preview">
-                    <button class="btn btn-remove hidden" id="removeImage">✕</button>
-                </div>
-            </section>
-
-            <!-- Controls Section -->
-            <section class="controls-section" id="controlsSection">
-                
-                <!-- Prompt -->
-                <div class="control-group">
-                    <label class="control-label">Descrição da transformação</label>
-                    <textarea 
-                        id="promptInput" 
-                        class="prompt-input" 
-                        placeholder="Ex: anime japonês estilo Studio Ghibli, cores vibrantes"
-                        rows="3"
-                    ></textarea>
-                    <div class="prompt-actions">
-                        <button class="btn btn-sm btn-ghost" id="btnMelhorarPrompt">✨ Melhorar prompt</button>
-                        <span class="char-count" id="charCount">0/1000</span>
-                    </div>
-                </div>
-
-                <!-- Quick Styles -->
-                <div class="control-group">
-                    <label class="control-label">Estilo rápido</label>
-                    <div class="style-chips" id="styleChips">
-                        <button class="style-chip" data-style="professional">📷 Profissional</button>
-                        <button class="style-chip active" data-style="anime">🌸 Anime</button>
-                        <button class="style-chip" data-style="artistic">🎨 Artístico</button>
-                        <button class="style-chip" data-style="cinematic">🎬 Cinemático</button>
-                        <button class="style-chip" data-style="realistic">📸 Realista</button>
-                    </div>
-                </div>
-
-                <!-- Strength Slider -->
-                <div class="control-group">
-                    <div class="slider-header">
-                        <label class="control-label">Força da transformação</label>
-                        <span class="slider-value" id="strengthValue">75%</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        id="strengthSlider" 
-                        class="strength-slider" 
-                        min="10" 
-                        max="90" 
-                        value="75"
-                    >
-                    <div class="slider-labels">
-                        <span>Subtle</span>
-                        <span>Balanced</span>
-                        <span>Creative</span>
-                    </div>
-                </div>
-
-                <!-- Generate Button -->
-                <button class="btn btn-generate" id="generateBtn" disabled>
-                    <span class="btn-icon">✨</span>
-                    <span id="generateText">Gerar Imagem</span>
-                    <span class="btn-price">1 crédito</span>
-                </button>
-
-            </section>
-
-            <!-- Result Section -->
-            <section class="result-section hidden" id="resultSection">
-                <div class="result-header">
-                    <h3>Resultado</h3>
-                    <span class="status-badge" id="statusBadge">Processando...</span>
-                </div>
-                
-                <div class="result-comparison">
-                    <div class="result-box">
-                        <label>Original</label>
-                        <img id="resultOriginal" alt="Original">
-                    </div>
-                    <div class="result-arrow">→</div>
-                    <div class="result-box">
-                        <label>Transformada</label>
-                        <img id="resultTransformed" class="loading" alt="Transformada">
-                        <div class="loading-overlay" id="loadingOverlay">
-                            <div class="spinner"></div>
-                            <p id="loadingText">Gerando...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="result-actions hidden" id="resultActions">
-                    <button class="btn btn-primary" id="btnDownload">⬇ Download</button>
-                    <button class="btn btn-outline" id="btnShare">🔗 Compartilhar</button>
-                    <button class="btn btn-ghost" id="btnNova">🔄 Nova transformação</button>
-                </div>
-            </section>
-
-            <!-- History Section -->
-            <section class="history-section" id="historySection">
-                <h3>Histórico de transformações</h3>
-                <div class="history-grid" id="historyGrid">
-                    <div class="history-empty">
-                        <p>Nenhuma transformação ainda</p>
-                    </div>
-                </div>
-            </section>
-
+        <div class="result-actions hidden" id="resultActions">
+          <button class="btn btn-primary" id="btnDownload">⬇ Download</button>
+          <button class="btn btn-outline" id="btnShare">🔗 Compartilhar</button>
+          <button class="btn btn-ghost" id="btnNova">🔄 Nova transformação</button>
         </div>
-    </main>
+      </section>
 
-    <!-- Modals -->
-    <div class="modal hidden" id="loginModal">
-        <div class="modal-content">
-            <button class="modal-close" id="closeLogin">✕</button>
-            <h2>Entrar</h2>
-            <form id="formLogin">
-                <input type="email" id="loginEmail" placeholder="Email" required>
-                <input type="password" id="loginPassword" placeholder="Senha" required>
-                <button type="submit" class="btn btn-primary btn-block">Entrar</button>
-            </form>
-            <p class="modal-footer">Não tem conta? <a href="#" id="linkCriarConta">Criar conta</a></p>
+      <!-- History Section -->
+      <section class="history-section" id="historySection">
+        <h3>Histórico de transformações</h3>
+        <div class="history-grid" id="historyGrid">
+          <div class="history-empty">
+            <p>Nenhuma transformação ainda</p>
+          </div>
         </div>
+      </section>
     </div>
+  </main>
 
-    <div class="modal hidden" id="registerModal">
-        <div class="modal-content">
-            <button class="modal-close" id="closeRegister">✕</button>
-            <h2>Criar conta</h2>
-            <form id="formRegister">
-                <input type="text" id="registerName" placeholder="Nome" required>
-                <input type="email" id="registerEmail" placeholder="Email" required>
-                <input type="password" id="registerPassword" placeholder="Senha" required>
-                <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
-            </form>
-            <p class="modal-footer">Já tem conta? <a href="#" id="linkEntrar">Entrar</a></p>
-        </div>
+  <!-- Modals -->
+  <div class="modal hidden" id="loginModal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeLogin">×</button>
+      <h2>Entrar</h2>
+      <form id="formLogin">
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Senha" required>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+      <p class="modal-footer">Não tem conta? <a href="#" id="linkCriarConta">Criar conta</a></p>
     </div>
+  </div>
 
-    <div class="modal hidden" id="creditsModal">
-        <div class="modal-content">
-            <button class="modal-close" id="closeCredits">✕</button>
-            <h2>Comprar Créditos</h2>
-            <div class="credit-plans" id="creditPlans"></div>
-        </div>
+  <div class="modal hidden" id="registerModal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeRegister">×</button>
+      <h2>Criar conta</h2>
+      <form id="formRegister">
+        <input type="text" id="registerName" placeholder="Nome" required>
+        <input type="email" id="registerEmail" placeholder="Email" required>
+        <input type="password" id="registerPassword" placeholder="Senha" required minlength="6">
+        <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+      </form>
+      <p class="modal-footer">Já tem conta? <a href="#" id="linkEntrar">Entrar</a></p>
     </div>
+  </div>
 
-    <!-- Scripts na ordem correta -->
-    <script src="js/api.js"></script>
-    <script src="js/app.js"></script>
+  <div class="modal hidden" id="creditsModal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeCredits">×</button>
+      <h2>Comprar Créditos</h2>
+      <div class="credit-plans" id="creditPlans">
+        <div class="credit-plan">
+          <h4>5 Créditos</h4>
+          <p class="price">R$ 9,90</p>
+          <button class="btn btn-primary">Comprar</button>
+        </div>
+        <div class="credit-plan popular">
+          <span class="badge">Mais popular</span>
+          <h4>15 Créditos</h4>
+          <p class="price">R$ 24,90</p>
+          <button class="btn btn-primary">Comprar</button>
+        </div>
+        <div class="credit-plan">
+          <h4>50 Créditos</h4>
+          <p class="price">R$ 69,90</p>
+          <button class="btn btn-primary">Comprar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts na ordem correta -->
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
