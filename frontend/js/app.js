@@ -283,6 +283,7 @@ function removeImage(e) {
 function updateCharCount() {
   const count = elements.promptInput.value.length;
   elements.charCount.textContent = `${count}/1000`;
+  updateGenerateButton();
 }
 
 async function improvePrompt() {
