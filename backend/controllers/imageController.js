@@ -33,7 +33,7 @@ class ImageController {
       
       let uploadResult;
       try {
-        uploadResult = await cloudinaryService.uploadUserImage(file.path, userId);
+        uploadResult = await cloudinaryService.uploadUserImage(file.buffer, userId, file.mimetype);
       } catch (error) {
         return res.status(500).json({ success: false, message: 'Falha ao processar imagem' });
       }
