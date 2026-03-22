@@ -36,14 +36,12 @@ class ImageGenerationService {
       
       const prediction = await replicate.run(this.models.primary, {
         input: {
-          image: inputImageUrl,
+          input_image: inputImageUrl,
           prompt: promptData.prompt,
-          prompt_strength: parseFloat(strength), // fofr usa prompt_strength
-          num_inference_steps: goFast ? 20 : 28,
-          guidance_scale: this.defaultParams.guidance_scale,
+          aspect_ratio: aspectRatio || '1:1',
           output_format: this.defaultParams.output_format,
           output_quality: this.defaultParams.output_quality,
-          disable_safety_checker: true
+          safety_tolerance: 5
         }
       });
       
@@ -60,7 +58,7 @@ class ImageGenerationService {
       
       return {
         success: true,
-        outputUrl: Array.isArray(prediction.output) ? prediction.output[0] : prediction.output,
+        outputUrl: prediction.output,
         metadata: {
           originalPrompt: userPrompt,
           enhancedPrompt: promptData.prompt,
@@ -94,12 +92,12 @@ class ImageGenerationService {
       
       const prediction = await replicate.run(this.models.secondary, {
         input: {
-          image: inputImageUrl,
+          input_image: inputImageUrl,
           prompt: promptData.prompt,
-          prompt_strength: parseFloat(options.strength) || 0.75,
-          num_inference_steps: 20,
-          guidance_scale: 3.5,
-          disable_safety_checker: true
+          aspect_ratio: options.aspectRatio || '1:1',
+          output_format: 'png',
+          output_quality: 80,
+          safety_tolerance: 5
         }
       });
       
@@ -109,7 +107,7 @@ class ImageGenerationService {
       
       return {
         success: true,
-        outputUrl: Array.isArray(prediction.output) ? prediction.output[0] : prediction.output,
+        outputUrl: prediction.output,
         metadata: {
           ...promptData,
           model: this.models.secondary,
