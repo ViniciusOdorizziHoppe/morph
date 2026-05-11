@@ -6,6 +6,7 @@ const errorHandler = require('./middleware/errorHandler');
 const imageRoutes = require('./routes/imageRoutes');
 const creditRoutes = require('./routes/creditRoutes');
 const authRoutes = require('./routes/authRoutes');
+const batchRoutes = require('./routes/batchRoutes');
 const app = express();
 
 // CORS - Configuração única e correta
@@ -63,6 +64,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/credits', creditRoutes);
+app.use('/api/batch', batchRoutes);
 
 // Legacy routes
 app.post('/api/transform', (req, res) => {

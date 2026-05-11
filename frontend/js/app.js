@@ -309,13 +309,44 @@ async function improvePrompt() {
 }
 
 function handleStyleSelect(e) {
-  if (e.target.classList.contains('style-chip')) {
-    document.querySelectorAll('.style-chip').forEach(chip => {
-      chip.classList.remove('active');
-    });
-    e.target.classList.add('active');
-    appState.selectedStyle = e.target.dataset.style;
+  const chip = e.target.closest('.style-chip');
+  if (!chip) return;
+  
+  if (chip.dataset.preset === 'car') {
+    appState.selectedStyle = 'automotive';
+    appState.strength = 0.60;
+    elements.strengthSlider.value = 60;
+    elements.strengthValue.textContent = '60%';
+    elements.promptInput.value = 'carro em showroom, fundo neutro, iluminação profissional';
+    elements.generateBtn.disabled = false;
+    updateCharCount();
+    updateStyleChips(chip);
+    return;
   }
+  if (chip.dataset.preset === 'bgremove') {
+    appState.selectedStyle = 'background_remove';
+    appState.strength = 0.70;
+    elements.strengthSlider.value = 70;
+    elements.strengthValue.textContent = '70%';
+    elements.promptInput.value = 'remover fundo, isolar em branco puro';
+    elements.generateBtn.disabled = false;
+    updateCharCount();
+    updateStyleChips(chip);
+    return;
+  }
+
+  document.querySelectorAll('.style-chip').forEach(c => {
+    c.classList.remove('active');
+  });
+  chip.classList.add('active');
+  appState.selectedStyle = chip.dataset.style;
+}
+
+function updateStyleChips(activeChip) {
+  document.querySelectorAll('.style-chip').forEach(chip => {
+    chip.classList.remove('active');
+  });
+  activeChip.classList.add('active');
 }
 
 function updateStrength(e) {

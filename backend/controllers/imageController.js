@@ -148,6 +148,48 @@ class ImageController {
       next(error);
     }
   }
+
+  async batchGenerate(req, res, next) {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'Envie pelo menos 1 imagem' });
+      }
+
+      const { style = 'automotive', strength = 0.6, prompt: userPrompt } = req.body;
+      const results = [];
+      const errors = [];
+      const BATCH_SIZE = 3;
+
+      for (let i = 0; i < req.files.length; i += BATCH_SIZE) {
+        const batch = req.files.slice(i, i + BATCH_SIZE);
+        const batchPromises = batch.map(async (file, idx) => {
+          try {
+            const cloudinaryService = require('../services/cloudinaryService');
+            const imageGenerationService = require('../services/imageGenerationService');
+            const uploadedUrl = await cloudinaryService.uploadImage(file.buffer, req.user.id);
+            const prompt = userPrompt || 'carro em showroom profissional, fundo neutro, iluminação de estúdio';
+            const result = await imageGenerationService.generateFromImage(
+              uploadedUrl, prompt, { style, strength: parseFloat(strength) }
+            );
+            return { index: i + idx, originalName: file.originalname, inputUrl: uploadedUrl, outputUrl: result.outputUrl, success: true };
+          } catch (err) {
+            return { index: i + idx, originalName: file.originalname, success: false, error: err.message };
+          }
+        });
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults.filter(r => r.success));
+        errors.push(...batchResults.filter(r => !r.success));
+      }
+
+      res.json({ success: true, total: req.files.length, processed: results.length, failed: errors.length, results, errors: errors.length > 0 ? errors : undefined });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBatchStatus(req, res) {
+    res.json({ message: 'Batch processing status endpoint', batchId: req.params.batchId });
+  }
 }
 
 module.exports = new ImageController();

@@ -23,6 +23,16 @@ const STYLE_TEMPLATES = {
     prefix: "masterpiece, best quality, anime style, detailed background, vibrant colors, cel shaded",
     suffix: "beautiful detailed eyes, high quality illustration",
     negative: "photorealistic, 3d, western cartoon, live action"
+  },
+  automotive: {
+    prefix: "professional car dealership photography, 8k resolution, studio lighting with soft reflections, neutral grey background, showroom quality, automotive magazine, sharp focus, clean reflections, commercial car listing",
+    suffix: "pristine condition appearance, professional vehicle listing, commercial automotive photography",
+    negative: "blurry, amateur, phone photo, driveway, street, messy, people, watermark, text, low quality, dark, underexposed, cluttered background, garage, home, reflection of photographer"
+  },
+  background_remove: {
+    prefix: "remove background entirely, isolate the subject on pure white studio background, commercial product photography, clean white seamless background, no surroundings, no environment, no floor texture, pure white background",
+    suffix: "isolated on white, product photography, catalog ready",
+    negative: "shadow on background, grey background, outdoor, context, environment, room, garage, street, gradient background, floor visible"
   }
 };
 

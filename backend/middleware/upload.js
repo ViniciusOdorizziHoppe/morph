@@ -50,4 +50,10 @@ const handleUploadError = (err, req, res, next) => {
   next();
 };
 
-module.exports = { uploadSingle: upload.single('image'), handleUploadError };
+const uploadMultiple = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024, files: 12 },
+  fileFilter: fileFilter
+}).array('images', 12);
+
+module.exports = { uploadSingle: upload.single('image'), uploadMultiple, handleUploadError };
